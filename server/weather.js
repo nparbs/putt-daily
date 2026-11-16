@@ -78,7 +78,9 @@ export async function handleWeather(req, url) {
   try {
     const data = await lookup(r1(lat), r1(lon));
     return { status: 200, body: { ...data, src } };
-  } catch {
-    return { status: 200, body: { kind: 'clear', src: 'none' } };
+  } catch (e) {
+    // Short reason only (no coordinates), so a failing upstream can be diagnosed from outside.
+    const why = String((e && e.cause && (e.cause.code || e.cause.message)) || (e && (e.name === 'TimeoutError' ? 'timeout' : e.message)) || 'error').slice(0, 60);
+    return { status: 200, body: { kind: 'clear', src: 'none', err: why } };
   }
 }
