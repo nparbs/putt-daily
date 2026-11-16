@@ -9,3 +9,25 @@ canvas {
   display: block; image-rendering: pixelated; image-rendering: crisp-edges;
   touch-action: none; background: #14301c;
 }
+.offscreen { position: fixed; left: -9999px; top: 0; }
+#nick {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 25, 14, 0.85); font-family: monospace; color: #f4efd8;
+}
+#nick[hidden] { display: none; }
+#nickform {
+  box-sizing: border-box; width: min(320px, 90vw); padding: 16px; text-align: center;
+  background: #1a3d25; border: 2px solid #e8c26a; box-shadow: 0 4px 0 #0c1f12;
+  -webkit-user-select: text; user-select: text;
+}
+#nickform p { margin: 0 0 10px; font-size: 13px; color: #bcd8b0; }
+#nickform p.big { font-size: 18px; font-weight: bold; color: #e8c26a; }
+#nickinput {
+  box-sizing: border-box; width: 100%; padding: 10px; font: 16px monospace; text-align: center;
+  background: #0c1f12; color: #fff; border: 2px solid #3a8a50; border-radius: 0; touch-action: auto;
+}
+#nickform .row { display: flex; gap: 10px; margin-top: 12px; }
+#nickform button {
+  flex: 1; min-height: 44px; font: bold 14px monospace; color: #fff; background: #2a6b3c;
+  border: 2px solid #e8c26a; border-radius: 0; cursor: pointer;
+}

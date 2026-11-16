@@ -14,24 +14,24 @@ Done when: putting on a phone feels right and the same shot always lands in the 
 
 ## v0.2: nine generated holes
 
-- [ ] Tile-based hole format
-- [ ] Generator driven by the date seed, Day 1 = 2026-11-11
-- [ ] Sand, water, slopes, bumpers, angled walls
-- [ ] Solver bot that rejects impossible and trivial holes
-- [ ] Nine-hole flow with par, rising difficulty and an end-of-round scorecard
-- [ ] Test: a recorded run replays to the same score
+- [x] Tile-based hole format
+- [x] Generator driven by the date seed, Day 1 = 2026-11-11
+- [x] Sand, water, slopes, bumpers, angled walls
+- [x] Solver bot that rejects impossible and trivial holes
+- [x] Nine-hole flow with par, rising difficulty and an end-of-round scorecard
+- [x] Test: a recorded run replays to the same score
 
 Done when: a week of generated courses are all finishable and none feel broken.
 
 ## v0.3: daily and shareable
 
-- [ ] Rollover at 00:00 UTC, one scored run a day, practice replays after
-- [ ] Nickname, streak and today's result stored on the device
-- [ ] Copy-paste scorecard with coloured squares
-- [ ] Title screen, day number, how-to-play
-- [ ] Archive list of every past day, playable for practice
-- [ ] Course audio: birds, putter, cup, applause, hole-in-one cheer
-- [ ] Three or four synthesized music loops, one per day, with separate music and sound switches
+- [x] Rollover at 00:00 UTC, one scored run a day, practice replays after
+- [x] Nickname, streak and today's result stored on the device
+- [x] Copy-paste scorecard with coloured squares
+- [x] Title screen, day number, how-to-play
+- [x] Archive list of every past day, playable for practice
+- [x] Course audio: birds, putter, cup, applause, hole-in-one cheer
+- [x] Three or four synthesized music loops, one per day, with separate music and sound switches
 
 Done when: it works as a complete single-player daily with no server.
 

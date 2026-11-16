@@ -9,6 +9,17 @@
 </head>
 <body>
 <canvas id="game" width="180" height="320"></canvas>
+<div id="nick" hidden>
+  <form id="nickform" autocomplete="off">
+    <p class="big">Pick a nickname</p>
+    <p id="nickmsg">3-16 letters, digits, space, _ or -</p>
+    <input id="nickinput" type="text" maxlength="16" minlength="3" spellcheck="false" autocapitalize="off">
+    <div class="row">
+      <button type="button" id="nickcancel">Cancel</button>
+      <button type="submit">Start</button>
+    </div>
+  </form>
+</div>
 <script type="module" src="main.js"></script>
 </body>
 </html>

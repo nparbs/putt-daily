@@ -54,3 +54,17 @@ The sim uses only `+ - * /`, `Math.sqrt`, `Math.abs`, `Math.min/max`, `Math.floo
 ## Stroke limit
 
 8 per hole. Reaching 8 without holing records 8 and the hole ends.
+
+## `shared/daily.js` exports (v0.2)
+
+- `DAY1 = '2026-11-11'` (UTC). `dayNumber(date = new Date())` returns 1 for 2026-11-11 UTC, 2 the next day, etc. `dateOfDay(n)` returns 'YYYY-MM-DD'.
+- `generateCourse(n)` returns `{ day: n, date, holes: [9 holes] }`, the same on every device. Hole ids are `d<n>-h<1..9>`, each with `name` and `par` (holes 1-3 par 2, 4-7 par 3, 8-9 par 4). Pure and synchronous. Budget: under 500 ms for a full course in Node on a desktop.
+- `shared/rng.js`: `makeRng(seed)` returns `{ next() /* [0,1) */, int(lo, hi) /* inclusive */, pick(arr) }`, integer-based (e.g. mulberry32), deterministic.
+
+## `client/audio.js` exports (v0.3)
+
+- `unlockAudio()` called on the first pointerdown; nothing makes sound before it.
+- `sfx(name, intensity = 1)` with names: `putt`, `wall`, `bumper`, `sand`, `water`, `lip`, `cup`, `applause`, `cheer`, `groan`, `ui`. `intensity` 0..1 scales loudness (e.g. hit speed).
+- `startMusic(dayNumber)` / `stopMusic()`; the track is picked from the day number.
+- `setMusicOn(bool)`, `setSfxOn(bool)`, `isMusicOn()`, `isSfxOn()`; saved in localStorage. Both default on at low volume.
+- Ambience (birds, light breeze) plays under everything and follows the sound-effects switch.
