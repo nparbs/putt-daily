@@ -1,24 +1,34 @@
 import { createSim, shoot, step, MAX_SPEED } from '../shared/physics.js';
 import { generateCourse, dayNumber, dateOfDay } from '../shared/daily.js';
 import { W, H, createInput } from './input.js';
-import { buildLayer, drawFrame } from './render.js';
+import { buildLayer, drawFrame, buildTitleLayer, drawTitleScene } from './render.js';
+import * as wx from './weather.js';
 import { drawResult, resultLabel, MAX_STROKES } from './hud.js';
-import { unlockAudio, sfx, startMusic, setMusicOn, setSfxOn, isMusicOn, isSfxOn } from './audio.js';
+import { unlockAudio, sfx, startMusic, setMusicOn, setSfxOn, isMusicOn, isSfxOn, setWeatherAmbience } from './audio.js';
 import * as store from './store.js';
-import { drawPlayHud, drawTitle, drawCard, drawArchive, fmtDiff, ROW_H, VIEW_H } from './screens.js';
+import { drawPlayHud, drawTitle, drawCard, drawArchive, drawSettings, fmtDiff, ROW_H, VIEW_H } from './screens.js';
 
 const SITE = 'https://putt.parbs.online';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+// The backing store is k device pixels per world unit (k a whole number), so pixel
+// edges stay crisp and text is drawn at the screen's real resolution.
+let K = 1;
 function fit() {
-  const s = Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H)));
-  canvas.style.width = W * s + 'px';
-  canvas.style.height = H * s + 'px';
+  const dpr = window.devicePixelRatio || 1;
+  const k = Math.max(1, Math.min(8, Math.floor(Math.min(innerWidth * dpr / W, innerHeight * dpr / H))));
+  if (k !== K || canvas.width !== W * k) {
+    K = k;
+    canvas.width = W * k; canvas.height = H * k;
+    if (hole) layer = buildLayer(hole, K);
+    titleLayer = null;
+  }
+  canvas.style.width = (W * k / dpr) + 'px';
+  canvas.style.height = (H * k / dpr) + 'px';
 }
 addEventListener('resize', fit);
-fit();
 
 // ---- state
 let screen = 'title';              // title | play | card | archive
@@ -27,6 +37,15 @@ let run = null, course = null, hole = null, sim = null, layer = null;
 let result = null, resultAt = 0, lipped = false, swallow = false;
 let card = null, copiedAt = -1e9, scroll = 0, note = '', noteAt = 0;
 const courses = new Map();
+let titleLayer = null;
+fit();
+
+// ---- weather (looks and sounds only)
+wx.setThunderHandler(() => play('thunder', 0.6 + Math.random() * 0.4));
+const syncAmbience = () => { try { setWeatherAmbience(wx.current()); } catch (_) {} };
+wx.refresh().then(syncAmbience);
+setInterval(() => wx.refresh().then(syncAmbience), 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wx.refresh().then(syncAmbience); });
 
 function courseFor(day) {
   if (!courses.has(day)) courses.set(day, generateCourse(day));
@@ -40,7 +59,7 @@ let unlocked = false;
 addEventListener('pointerdown', () => {
   if (unlocked) return;
   unlocked = true;
-  try { unlockAudio(); startMusic(today()); } catch (_) {}
+  try { unlockAudio(); startMusic(today()); syncAmbience(); } catch (_) {}
 }, true);
 const ui_sfx = () => { try { sfx('ui'); } catch (_) {} };
 const play = (n, i) => { try { sfx(n, Math.max(0, Math.min(1, i))); } catch (_) {} };
@@ -60,7 +79,7 @@ function resumeRun(r) {
 function enterHole() {
   hole = course.holes[run.idx];
   sim = createSim(hole);
-  layer = buildLayer(hole);
+  layer = buildLayer(hole, K);
   result = null; lipped = false;
   try {
     for (const s of run.shots) {           // rebuild mid-hole progress after a reload
@@ -185,6 +204,7 @@ function click(id) {
   else if (id === 'practice') doPractice(today());
   else if (id === 'again') doPractice(card.day);
   else if (id === 'archive') { screen = 'archive'; scroll = 0; }
+  else if (id === 'settings') screen = 'settings';
   else if (id === 'music') setMusicOn(!isMusicOn());
   else if (id === 'sound') setSfxOn(!isSfxOn());
   else if (id === 'copy') {
@@ -193,6 +213,29 @@ function click(id) {
       copiedAt = performance.now(); if (!ok) copiedAt = -1e9;
     });
   } else if (id.startsWith('day:')) doPractice(Number(id.slice(4)));
+  else if (id.startsWith('wx:')) weatherClick(id.slice(3));
+}
+
+function weatherClick(a) {
+  const m = wx.getMode(), P = wx.PREVIEWS;
+  if (a === 'live' || a === 'off') wx.setMode(a);
+  else if (a === 'prev' || a === 'next') {
+    const i = P.indexOf(m);
+    const j = i < 0 ? (a === 'next' ? 0 : P.length - 1) : (i + (a === 'next' ? 1 : P.length - 1)) % P.length;
+    wx.setMode(P[j]);
+  } else if (a === 'gps') {
+    wx.useMyLocation().then(ok => { gpsNote = ok ? '' : 'Location not allowed'; syncAmbience(); });
+    gpsNote = 'Asking for location...';
+  } else if (a === 'forget') { wx.forgetLocation(); gpsNote = ''; }
+  syncAmbience();
+}
+let gpsNote = '';
+const PREVIEW_NAMES = { clear: 'Sunny', night: 'Night', partly: 'Partly cloudy', cloudy: 'Cloudy', fog: 'Fog', rain: 'Rain', heavy: 'Heavy rain', snow: 'Snow', storm: 'Thunderstorm', windy: 'Windy' };
+function settingsState() {
+  const m = wx.getMode(), src = wx.liveSource();
+  let loc = src === 'gps' ? 'Using your phone location.' : src === 'ip' ? 'Rough area from your connection.' : 'Unknown, showing clear skies.';
+  if (gpsNote) loc = gpsNote;
+  return { music: isMusicOn(), sfx: isSfxOn(), mode: m, previewLabel: PREVIEW_NAMES[m] || m, gps: wx.hasGps(), locLine: loc };
 }
 
 // ---- pointer handling for the non-play screens
@@ -265,6 +308,10 @@ function frame(now) {
   acc += Math.min(100, now - last);
   last = now;
   ui = [];
+  ctx.setTransform(K, 0, 0, K, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  const kind = wx.current().kind;
+  if (layer && layer.kind !== kind) layer = buildLayer(hole, K);
   if (screen === 'play') {
     while (acc >= DT) {
       acc -= DT;
@@ -277,10 +324,19 @@ function frame(now) {
     if (result) drawResult(ctx, result.label, result.final ? 'Tap for scorecard' : 'Tap for next hole');
   } else {
     acc = 0;
+    if (!titleLayer || titleLayer.kind !== kind) titleLayer = buildTitleLayer(K);
+    drawTitleScene(ctx, titleLayer, now);
     if (screen === 'title') drawTitle(ctx, ui, titleState());
+    else if (screen === 'settings') drawSettings(ctx, ui, settingsState());
     else if (screen === 'card') drawCard(ctx, ui, cardState());
     else if (screen === 'archive') drawArchive(ctx, ui, { days: archiveDays(), scroll });
   }
   requestAnimationFrame(frame);
 }
+try {
+  const sq = new URLSearchParams(location.search).get('screen');
+  if (sq === 'settings' || sq === 'archive') screen = sq;
+  const hq = Number(new URLSearchParams(location.search).get('hole'));
+  if (hq >= 1 && hq <= 9) { startRun(today(), 'practice'); run.idx = hq - 1; enterHole(); }
+} catch (_) {}
 requestAnimationFrame(frame);

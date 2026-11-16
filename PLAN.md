@@ -13,8 +13,9 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 - **Every past course stays playable** from an archive list.
 - **Sound:** a few music tracks plus golf-course audio (see Sound below).
 - **Theme:** simple, classic mini-golf. Green felt, wooden borders, a flag in the cup. No satire or story.
-- **Daily content:** nine new generated holes a day and nothing else. No weather, no rule changes.
-- **Look:** top-down 2D pixel art.
+- **Daily content:** nine new generated holes a day and nothing else. No rule changes.
+- **Live weather (looks only):** the course is drawn in the player's real local weather: rain, snow, fog, storms, wind, cloud shadows and night lighting, with matching ambience. It never changes the holes, the physics or the score, so the daily stays fair. Location comes from Cloudflare's rough visitor location, or the phone's location if the player opts in (rounded to about 10 km). Settings can switch it to always clear or preview each look.
+- **Look:** top-down 2D pixel art, drawn sharp at the phone's real resolution.
 - **Other players:** shot trails after each hole, a daily leaderboard and a shareable scorecard. No live players in the first version.
 - **Phones first:** modern phones only, 640x360 minimum, portrait. Desktop works with the mouse.
 
@@ -68,7 +69,7 @@ Chosen for launch (2026-11-16): percent beaten, challenge link, named courses wi
 
 ## Technical shape
 
-- **Client:** plain JavaScript and one canvas, no framework. Pixel art drawn at a low internal resolution and scaled up with whole-number scaling.
+- **Client:** plain JavaScript and one canvas, no framework. The world is 180 x 320 units; the canvas backing store is a whole number of device pixels per unit, so edges and text stay sharp.
 - **Server:** a small Node service on the Debian VM with SQLite. Three calls: submit a run, get trails for a hole, get the leaderboard.
 - **Cheat checks:** the server replays each submitted shot list with the same physics code and uses its own stroke count. A run that doesn't replay to completion is rejected.
 - **Shared code:** the physics and the hole generator are one module used by both client and server.

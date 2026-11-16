@@ -2,6 +2,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+import { handleWeather } from './weather.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -19,6 +21,24 @@ function readVersion() {
   }
 }
 const VERSION = readVersion();
+
+// Content hash of client/ and shared/. index.html loads assets from /v/<BUILD>/...,
+// so Cloudflare's 4-hour cache of scripts and styles never serves an old build.
+function hashDirs(dirs) {
+  const h = crypto.createHash('sha256');
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const f = path.join(d, e.name);
+      if (e.isDirectory()) walk(f);
+      else { h.update(path.relative(root, f)); h.update(fs.readFileSync(f)); }
+    }
+  };
+  for (const d of dirs) walk(d);
+  return h.digest('hex').slice(0, 12);
+}
+const BUILD = hashDirs([clientDir, sharedDir]);
+const INDEX_HTML = fs.readFileSync(path.join(clientDir, 'index.html'), 'utf8')
+  .replace(/(src|href)="(?![a-z]+:|\/)([^"]+\.(?:js|css))"/g, `$1="/v/${BUILD}/c/$2"`);
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -55,7 +75,7 @@ function resolveSafe(baseDir, relPath) {
   return full;
 }
 
-async function serveFile(req, res, filePath) {
+async function serveFile(req, res, filePath, immutable = false) {
   let target = filePath;
   let stat = await fs.promises.stat(target).catch(() => null);
   if (stat && stat.isDirectory()) {
@@ -68,7 +88,7 @@ async function serveFile(req, res, filePath) {
   const headers = {
     'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
     'Content-Length': stat.size,
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+    'Cache-Control': ext === '.html' ? 'no-cache' : immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=300',
   };
   res.writeHead(200, { ...SECURITY_HEADERS, ...headers });
   if (req.method === 'HEAD') return res.end();
@@ -97,8 +117,25 @@ async function handle(req, res) {
       res,
       200,
       { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' },
-      JSON.stringify({ version: VERSION }),
+      JSON.stringify({ version: VERSION, build: BUILD }),
     );
+  }
+
+  if (pathname === '/api/weather') {
+    const { status, body } = await handleWeather(req, url);
+    return send(res, status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, JSON.stringify(body));
+  }
+
+  if (pathname === '/' || pathname === '/index.html') {
+    return send(res, 200, { 'Content-Type': CONTENT_TYPES['.html'], 'Cache-Control': 'no-cache' }, req.method === 'HEAD' ? undefined : INDEX_HTML);
+  }
+
+  // /v/<hash>/c/* -> client, /v/<hash>/shared/* -> shared (relative imports keep working).
+  const vm = /^\/v\/[0-9a-f]{6,64}\/(c|shared)\/(.+)$/.exec(pathname);
+  if (vm) {
+    const full = resolveSafe(vm[1] === 'c' ? clientDir : sharedDir, vm[2]);
+    if (!full) return notFound(res);
+    return serveFile(req, res, full, true);
   }
 
   if (pathname === '/shared' || pathname.startsWith('/shared/')) {

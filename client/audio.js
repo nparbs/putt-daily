@@ -152,6 +152,11 @@ const SFX = {
     tone('sawtooth', 190, 120, t, dur, 0.05, null, 0.2);
   },
   ui(t) { tone('square', 1400, 1000, t, 0.03, 0.12); },
+  thunder(t, k) {
+    noise(t, 0.25, 0.35 * k, 'lowpass', 1800, 300, 0.7, ambBus, 0.01);
+    noise(t + 0.05, 3.2, 0.7 * k, 'lowpass', 180, 50, 0.9, ambBus, 0.12);
+    noise(t + 0.6, 2.4, 0.4 * k, 'lowpass', 120, 40, 0.9, ambBus, 0.3);
+  },
 };
 
 function clap(t, dur, count, vol, spread) {
@@ -177,13 +182,48 @@ export function sfx(name, intensity = 1) {
 }
 
 // ---------- ambience ----------
+// Follows the live weather: birds by day in fair weather, crickets on clear
+// nights, rain hiss when wet, a stronger breeze when windy.
 let ambTimer = null;
+let breezeGain = null, rainGain = null, rainFilter = null;
+let wxAmb = { birds: true, crickets: false, rain: 0, wind: 0.2 };
+
+let lastWx = null;
+export function setWeatherAmbience(w) {
+  if (!w) return;
+  lastWx = w;
+  const wet = { drizzle: 0.35, rain: 0.7, heavy: 1, storm: 1 }[w.kind] || 0;
+  const fair = w.kind === 'clear' || w.kind === 'partly' || w.kind === 'cloudy';
+  wxAmb = {
+    birds: fair && !w.night,
+    crickets: fair && w.night && (w.tempC == null || w.tempC > 8),
+    rain: wet,
+    wind: Math.min(1, (w.windKmh || 0) / 45),
+  };
+  if (!ctx || !breezeGain) return;
+  const t = ctx.currentTime;
+  breezeGain.gain.setTargetAtTime(0.035 + wxAmb.wind * 0.11, t, 1.5);
+  rainGain.gain.setTargetAtTime(wxAmb.rain * 0.22, t, 1.5);
+}
+
 function startAmbience() {
+  // rain: wide filtered noise, silent until the weather says otherwise
+  {
+    const s = ctx.createBufferSource(), hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noiseBuf; s.loop = true;
+    hp.type = 'highpass'; hp.frequency.value = 900;
+    lp.type = 'lowpass'; lp.frequency.value = 7000;
+    g.gain.value = 0;
+    s.connect(hp); hp.connect(lp); lp.connect(g); g.connect(ambBus);
+    s.start(0, 0.7);
+    rainGain = g; rainFilter = lp;
+  }
   // breeze
   const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
   s.buffer = noiseBuf; s.loop = true;
   f.type = 'bandpass'; f.frequency.value = 500; f.Q.value = 0.6;
   g.gain.value = 0.05;
+  breezeGain = g;
   const lfo = ctx.createOscillator(), lg = ctx.createGain();
   lfo.frequency.value = 0.12; lg.gain.value = 0.03;
   lfo.connect(lg); lg.connect(g.gain);
@@ -193,12 +233,22 @@ function startAmbience() {
   s.connect(f); f.connect(g); g.connect(ambBus);
   s.start(); lfo.start(); lfo2.start();
   scheduleChirp();
+  setWeatherAmbience(lastWx);
 }
 
 function scheduleChirp() {
   ambTimer = setTimeout(() => {
     try {
-      if (ctx && ctx.state === 'running' && sfxOn) {
+      if (ctx && ctx.state === 'running' && sfxOn && wxAmb.crickets) {
+        const base = ctx.currentTime + 0.02;
+        for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+          const tt = base + i * 0.06;
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = 'sine'; o.frequency.setValueAtTime(4300 + Math.random() * 200, tt);
+          env(g, tt, 0.005, 0.03, 0.04);
+          o.connect(g); g.connect(ambBus); o.start(tt); o.stop(tt + 0.06);
+        }
+      } else if (ctx && ctx.state === 'running' && sfxOn && wxAmb.birds) {
         const base = ctx.currentTime + 0.02;
         const n = 1 + Math.floor(Math.random() * 4);
         const f = 2200 + Math.random() * 1800;

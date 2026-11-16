@@ -35,7 +35,21 @@ Done when: a week of generated courses are all finishable and none feel broken.
 
 Done when: it works as a complete single-player daily with no server.
 
-## v0.4: other players
+## v0.4: clear graphics and live weather
+
+- [x] Draw at the phone's real resolution: sharp text, edges and ball
+- [x] Clearer course art: raised wooden rails with shadows, scenery outside the course, mowing stripes, animated slope arrows, sand lip, water foam, tee mat, cup rim, outlined ball, aim arrow
+- [x] Title, scorecard, archive and settings over a live practice green
+- [x] `/api/weather`: Open-Meteo lookup from Cloudflare visitor location or opt-in phone location, rounded to 0.1 deg, cached 15 min
+- [x] Looks: clear, night, partly cloudy, cloudy, fog, drizzle, rain, heavy rain, snow, thunderstorm, windy (leaves, flag)
+- [x] Ambience follows the weather: rain hiss, wind, birds by day, crickets on warm nights, thunder
+- [x] Settings screen: music, effects, weather live / always clear / preview, phone location
+- [ ] Turn on Cloudflare "Add visitor location headers" for parbs.online (until then live weather needs the phone-location button)
+- [ ] Playtest every look on a phone for readability
+
+Done when: every look keeps the ball, cup, walls and hazards easy to read on a 360 x 640 phone.
+
+## v0.5: other players
 
 - [ ] Node and SQLite service on the Debian VM
 - [ ] Submit a run; server replays it to check the score
@@ -46,7 +60,7 @@ Done when: it works as a complete single-player daily with no server.
 
 Done when: two phones playing the same day see each other's trails and scores.
 
-## v0.5: launch
+## v0.6: launch
 
 - [ ] Deploy to the parbs.online subdomain with versioned assets
 - [ ] Card on parbs.online with a gameplay loop

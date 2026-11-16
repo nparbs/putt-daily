@@ -11,7 +11,7 @@ Plain ES modules, no bundler, no framework. `shared/` runs unchanged in the brow
 
 ## Units
 
-- Internal canvas 180 x 320 (portrait), scaled up by a whole number. Top 24 px is the HUD.
+- World 180 x 320 units (portrait). The canvas backing store is `k` device pixels per unit (`k` a whole number, from devicePixelRatio); `ctx.setTransform(k, ...)` each frame so all drawing is in world units. Top 24 units are the HUD.
 - Tile = 10 px. A hole is up to 18 x 29 tiles and fits on one screen (no camera scroll).
 - World units are internal pixels. Origin top-left, y down.
 
@@ -68,3 +68,20 @@ The sim uses only `+ - * /`, `Math.sqrt`, `Math.abs`, `Math.min/max`, `Math.floo
 - `startMusic(dayNumber)` / `stopMusic()`; the track is picked from the day number.
 - `setMusicOn(bool)`, `setSfxOn(bool)`, `isMusicOn()`, `isSfxOn()`; saved in localStorage. Both default on at low volume.
 - Ambience (birds, light breeze) plays under everything and follows the sound-effects switch.
+
+## `client/weather.js` (v0.4)
+
+Cosmetic only. Nothing in `shared/` reads it.
+
+- `current()` returns `{ kind, night, tempC, windKmh, windDir, src }`. `kind` is one of `clear partly cloudy fog drizzle rain heavy snow storm`. `src` is `ip | gps | none | preview | off`.
+- `refresh()` fetches `/api/weather` (with `?lat=&lon=` if the player opted in to phone location), at most every 15 min.
+- `getMode()/setMode(m)`: `live`, `off` (always clear) or a preview from `PREVIEWS`. `?wx=<kind>` in the URL forces one for testing.
+- `palette()`, `drawGround()`, `drawNight()`, `drawSky()`, `drawIcon()` are used by `render.js` and `screens.js`.
+
+## `GET /api/weather`
+
+Location: `lat`/`lon` query, else Cloudflare `cf-iplatitude`/`cf-iplongitude` headers. Rounded to 0.1 deg, Open-Meteo `current` lookup, cached 15 min per cell in memory, 20 requests a minute per IP. Returns the `current()` shape plus `code`; `{ kind: 'clear', src: 'none' }` when there is no location or the lookup fails.
+
+## Dev URL switches
+
+`?hole=N` starts today's practice round at hole N. `?screen=settings|archive`. `?wx=<kind>`.
