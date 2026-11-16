@@ -15,7 +15,7 @@ Done when: putting on a phone feels right and the same shot always lands in the 
 ## v0.2: nine generated holes
 
 - [ ] Tile-based hole format
-- [ ] Generator driven by the date seed
+- [ ] Generator driven by the date seed, Day 1 = 2026-11-11
 - [ ] Sand, water, slopes, bumpers, angled walls
 - [ ] Solver bot that rejects impossible and trivial holes
 - [ ] Nine-hole flow with par, rising difficulty and an end-of-round scorecard
@@ -29,7 +29,9 @@ Done when: a week of generated courses are all finishable and none feel broken.
 - [ ] Nickname, streak and today's result stored on the device
 - [ ] Copy-paste scorecard with coloured squares
 - [ ] Title screen, day number, how-to-play
-- [ ] Ball and cup sounds
+- [ ] Archive list of every past day, playable for practice
+- [ ] Course audio: birds, putter, cup, applause, hole-in-one cheer
+- [ ] Three or four synthesized music loops, one per day, with separate music and sound switches
 
 Done when: it works as a complete single-player daily with no server.
 
@@ -55,7 +57,6 @@ Done when: two phones playing the same day see each other's trails and scores.
 
 - Windmills, moving gates, tunnels, ice
 - Weekly and all-time boards, hole-in-one counts
-- Yesterday's course for practice
 - Private rooms to race friends on today's course
 - Ball and flag skins earned by streaks
-- Music
+- The proposed daily hooks in PLAN.md, once chosen

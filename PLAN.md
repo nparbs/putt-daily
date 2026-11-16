@@ -8,6 +8,10 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 
 ## Decisions made (2026-11-16)
 
+- **Name:** Putt Daily, at putt.parbs.online.
+- **Day 1 is 2026-11-11.** Courses exist from that date on, so there are past days to test with before launch.
+- **Every past course stays playable** from an archive list.
+- **Sound:** a few music tracks plus golf-course audio (see Sound below).
 - **Theme:** simple, classic mini-golf. Green felt, wooden borders, a flag in the cup. No satire or story.
 - **Daily content:** nine new generated holes a day and nothing else. No weather, no rule changes.
 - **Look:** top-down 2D pixel art.
@@ -19,6 +23,7 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 - The day's seed is the UTC date. The same seed always produces the same nine holes, on every device.
 - The course rolls over at 00:00 UTC. A run started before the rollover can be finished and counts for the day it started.
 - One scored run per day per player. After that, the course can be replayed for practice, which doesn't count.
+- Past days are open from an archive list, numbered from Day 1 (2026-11-11). An archive run shows that day's leaderboard and trails and keeps your own best, but doesn't join the board, since that day is over.
 - Stroke limit of 8 per hole. Reaching it records an 8 and moves on.
 
 ## Holes
@@ -42,6 +47,23 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 - **Scorecard:** a copy-paste text card with one coloured square per hole (under par, par, over par) and the total, with the day number and a link.
 - **Names:** a nickname typed once and stored on the device. No accounts. Names are length-limited and filtered.
 
+## Sound
+
+- **Course audio:** birdsong and a light breeze as the background, a putter tap, wall knocks, sand and water sounds, the ball dropping in the cup, polite applause for par or better, a bigger cheer for a hole-in-one, a crowd groan when the ball lips out.
+- **Music:** three or four short, relaxed chiptune loops, one picked per day from the seed so each day has its tune. Synthesized in code with Web Audio, so there are no audio files to license or download.
+- Music and sound effects have separate switches, and both start quiet. Nothing plays until the first tap.
+
+## Proposed daily hooks (suggested, not yet agreed)
+
+- **"Better than 73% of players"** on the scorecard, beside the rank.
+- **Challenge link:** sharing carries your run, so a friend who opens it plays against your trail and sees who won.
+- **Named courses and a signature hole:** each day gets a generated name, and hole 9 is always the showpiece.
+- **Shot of the day:** the title screen replays the day's best hole-in-one.
+- **Streak rewards:** ball colours and flags unlocked at 3, 7, 30 days, visible in your trails.
+- **Golden cup:** one hole a day has a second, harder cup worth one stroke off.
+- **Weekly cup:** the seven daily totals add up to a Monday-to-Sunday board.
+- **Under two minutes:** fast ball roll, no waits between holes, round timer shown at the end.
+
 ## Technical shape
 
 - **Client:** plain JavaScript and one canvas, no framework. Pixel art drawn at a low internal resolution and scaled up with whole-number scaling.
@@ -58,7 +80,4 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 
 ## Open questions
 
-- The name. "Putt Daily" is a working title.
-- The subdomain (putt.parbs.online is the assumption).
-- Whether there is sound and music in the first version, or only ball and cup sounds.
-- Whether yesterday's course stays playable for practice.
+- Which of the proposed daily hooks to build, and in which version.
