@@ -53,7 +53,9 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 - **Music:** three or four short, relaxed chiptune loops, one picked per day from the seed so each day has its tune. Synthesized in code with Web Audio, so there are no audio files to license or download.
 - Music and sound effects have separate switches, and both start quiet. Nothing plays until the first tap.
 
-## Proposed daily hooks (suggested, not yet agreed)
+## Daily hooks
+
+Chosen for launch (2026-11-16): percent beaten, challenge link, named courses with a signature hole, and shot of the day. The rest are under Later in ROADMAP.md.
 
 - **"Better than 73% of players"** on the scorecard, beside the rank.
 - **Challenge link:** sharing carries your run, so a friend who opens it plays against your trail and sees who won.
@@ -70,7 +72,8 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 - **Server:** a small Node service on the Debian VM with SQLite. Three calls: submit a run, get trails for a hole, get the leaderboard.
 - **Cheat checks:** the server replays each submitted shot list with the same physics code and uses its own stroke count. A run that doesn't replay to completion is rejected.
 - **Shared code:** the physics and the hole generator are one module used by both client and server.
-- **Hosting:** static files on GitHub Pages behind Cloudflare at a parbs.online subdomain. Every asset link carries a version number, because Cloudflare caches CSS, scripts and images.
+- **Hosting:** one Node container on the Debian VM serves both the page and `/api`, on the Scrap Riot tunnel network (`putt:8795`), at putt.parbs.online. Every asset link carries a version number, because Cloudflare caches CSS, scripts and images.
+- **Screen:** every hole fits one portrait screen (up to 18 x 29 tiles), no camera scroll. Module interfaces are in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## Risks
 
@@ -80,4 +83,4 @@ Open the page, play today's nine holes, and you're done until tomorrow. Drag bac
 
 ## Open questions
 
-- Which of the proposed daily hooks to build, and in which version.
+- None right now.

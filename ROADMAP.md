@@ -4,11 +4,11 @@ Each version is playable on its own. See [PLAN.md](PLAN.md) for the design.
 
 ## v0.1: one hole feels good
 
-- [ ] Canvas, pixel scaling, portrait layout for phones
-- [ ] Drag-to-aim with a power line, release to putt
-- [ ] Ball physics on a fixed time step: walls, bounce, friction, cup
-- [ ] One hand-made test hole
-- [ ] Stroke counter and stroke limit
+- [x] Canvas, pixel scaling, portrait layout for phones
+- [x] Drag-to-aim with a power line, release to putt
+- [x] Ball physics on a fixed time step: walls, bounce, friction, cup
+- [x] One hand-made test hole
+- [x] Stroke counter and stroke limit
 
 Done when: putting on a phone feels right and the same shot always lands in the same place.
 
@@ -52,6 +52,10 @@ Done when: two phones playing the same day see each other's trails and scores.
 - [ ] Card on parbs.online with a gameplay loop
 - [ ] Link-preview image for shared scorecards
 - [ ] Playtest pass on hole difficulty
+- [ ] "Better than N% of players" on the scorecard
+- [ ] Challenge link: a shared link carries your run, and a friend plays against your trail
+- [ ] Generated course name each day, with hole 9 as the signature hole
+- [ ] Shot of the day: the title screen replays the day's best hole-in-one
 
 ## Later, not committed
 
@@ -59,4 +63,4 @@ Done when: two phones playing the same day see each other's trails and scores.
 - Weekly and all-time boards, hole-in-one counts
 - Private rooms to race friends on today's course
 - Ball and flag skins earned by streaks
-- The proposed daily hooks in PLAN.md, once chosen
+- Streak rewards, golden cup, weekly cup, under-two-minutes mode

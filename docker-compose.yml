@@ -1,0 +1,25 @@
+services:
+  putt:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "8795"
+    networks:
+      - tunnel
+    volumes:
+      - putt-data:/data
+    environment:
+      DATA_DIR: /data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 64
+volumes:
+  putt-data:
+networks:
+  tunnel:
+    external: true
+    name: ${TUNNEL_NETWORK:-scrap-riot_default}
