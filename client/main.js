@@ -1,12 +1,13 @@
 import { createSim, shoot, step, MAX_SPEED } from '../shared/physics.js';
 import { generateCourse, dayNumber, dateOfDay } from '../shared/daily.js';
 import { W, H, createInput } from './input.js';
-import { buildLayer, drawFrame, buildTitleLayer, drawTitleScene } from './render.js';
+import { buildLayer, drawFrame, buildTitleLayer, drawTitleScene, buildTrails, drawTrails } from './render.js';
+import * as net from './net.js';
 import * as wx from './weather.js';
 import { drawResult, resultLabel, MAX_STROKES } from './hud.js';
 import { unlockAudio, sfx, startMusic, setMusicOn, setSfxOn, isMusicOn, isSfxOn, setWeatherAmbience } from './audio.js';
 import * as store from './store.js';
-import { drawPlayHud, drawTitle, drawCard, drawArchive, drawSettings, fmtDiff, ROW_H, VIEW_H } from './screens.js';
+import { drawPlayHud, drawTitle, drawCard, drawArchive, drawSettings, drawBoard, fmtDiff, ROW_H, VIEW_H, BOARD_ROW, BOARD_VIEW } from './screens.js';
 
 const SITE = 'https://putt.parbs.online';
 const canvas = document.getElementById('game');
@@ -44,6 +45,8 @@ fit();
 wx.setThunderHandler(() => play('thunder', 0.6 + Math.random() * 0.4));
 const syncAmbience = () => { try { setWeatherAmbience(wx.current()); } catch (_) {} };
 wx.refresh().then(syncAmbience);
+setTimeout(retrySubmit, 1500);
+addEventListener('online', retrySubmit);
 setInterval(() => wx.refresh().then(syncAmbience), 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) wx.refresh().then(syncAmbience); });
 
@@ -77,6 +80,7 @@ function resumeRun(r) {
 }
 
 function enterHole() {
+  trails = null; trailsKey = '';
   hole = course.holes[run.idx];
   sim = createSim(hole);
   layer = buildLayer(hole, K);
@@ -97,19 +101,72 @@ function checkFinish(silent, now = performance.now()) {
   if (!(holed || (sim.state === 'rest' && sim.strokes >= MAX_STROKES))) return;
   const n = Math.min(sim.strokes, MAX_STROKES);
   const last = run.idx >= 8;
+  const holeNo = run.idx + 1, mine = run.shots.slice();
+  run.holes = Array.isArray(run.holes) ? run.holes : [];
+  run.holes[run.idx] = mine;
   run.strokes.push(n); run.shots = []; run.idx++;
+  loadTrails(run.day, holeNo, hole, mine);
   result = { label: resultLabel(n, hole.par, holed), final: last, strokes: n };
   resultAt = now;
   if (last) {
     const pt = parTotal(course);
-    store.recordRun(run.day, run.mode, run.strokes, pt);
+    store.recordRun(run.day, run.mode, run.strokes, pt, run.holes.length === 9 ? run.holes : null);
     store.saveRun(run.mode, null);
     card = { day: run.day, mode: run.mode, strokes: run.strokes.slice(), course };
+    if (run.mode === 'daily') submitScored(run.day);
   } else store.saveRun(run.mode, run);
   if (!silent && holed) {
     if (n === 1) play('cheer', 1);
     else if (n <= hole.par) play('applause', 1);
   }
+}
+
+// ---- other players
+let trails = null, trailsAt = 0, trailsKey = '';
+function loadTrails(day, holeNo, h, mine) {
+  const key = day + ':' + holeNo;
+  trailsKey = key; trails = buildTrails(h, [{ shots: mine, mine: true }]); trailsAt = performance.now();
+  net.getTrails(day, holeNo).then(r => {
+    if (trailsKey !== key || !r.ok || !Array.isArray(r.body.trails)) return;
+    trails = buildTrails(h, [...r.body.trails, { shots: mine, mine: true }]);
+    trailsAt = performance.now();
+  });
+}
+
+let submitting = false;
+async function submitScored(day) {
+  const sc = store.getScored(day);
+  if (!sc || submitting) return;
+  if (!Array.isArray(sc.h) || sc.h.length !== 9 || sc.h.some(x => !Array.isArray(x) || !x.length)) {
+    if (!sc.sub) store.setSubmit(day, { err: 'old' });
+    return;
+  }
+  if (day < today() - 1) { if (!sc.sub) store.setSubmit(day, { err: 'late' }); return; }
+  submitting = true;
+  const r = await net.submitRun(day, store.pid(), store.getNick(), sc.h);
+  submitting = false;
+  if (r.ok && r.body.ok) store.setSubmit(day, { rank: r.body.rank, of: r.body.of, humans: r.body.humans, better: r.body.better });
+  else if (r.body.error === 'name') store.setSubmit(day, { err: 'name' });
+  else if (r.status === 0 || r.status === 429 || r.status >= 500) store.setSubmit(day, { err: 'offline' });
+  else store.setSubmit(day, { err: 'rejected' });
+}
+function retrySubmit() {
+  for (const d of [today(), today() - 1]) {
+    const sc = d >= 1 && store.getScored(d);
+    if (sc && (!sc.sub || sc.sub.err === 'offline')) submitScored(d);
+  }
+}
+
+let board = { day: 1, data: null, loading: false, scroll: 0, err: '' };
+function openBoard(day) {
+  screen = 'board';
+  board = { day, data: null, loading: true, scroll: 0, err: '' };
+  net.getBoard(day, store.pid()).then(r => {
+    if (board.day !== day) return;
+    board.loading = false;
+    if (r.ok) board.data = r.body;
+    else board.err = r.status === 0 ? 'Offline: the leaderboard needs a connection.' : 'Could not load the leaderboard.';
+  });
 }
 
 function onEvents(evs) {
@@ -129,14 +186,30 @@ function cardState() {
     day: card.day, course: c.name, practice: !scored, strokes: card.strokes, pars: c.holes.map(h => h.par),
     streak: store.streak(today()), nick: store.getNick(),
     copied: performance.now() - copiedAt < 1500,
+    ...rankInfo(card.day, scored),
   };
+}
+function rankInfo(day, scored) {
+  if (!scored) return { rankLine: '', rankSub: '' };
+  const sc = store.getScored(day), sub = sc && sc.sub;
+  if (!sub) return { rankLine: 'Sending to the leaderboard...', rankSub: '' };
+  if (sub.rank) return {
+    rankLine: 'Rank ' + sub.rank + ' of ' + sub.of,
+    rankSub: sub.better != null ? 'Better than ' + sub.better + '% of players' : 'First player on the board today',
+  };
+  if (sub.err === 'name') return { rankLine: 'That name is not allowed on the board', rankSub: '', nameErr: true };
+  if (sub.err === 'offline') return { rankLine: 'Offline: will send when connected', rankSub: '' };
+  if (sub.err === 'old') return { rankLine: 'Played before the leaderboard opened', rankSub: '' };
+  return { rankLine: 'Not on the leaderboard', rankSub: '' };
 }
 
 // ---- share
 function shareText(day, strokes, pars) {
   const t = strokes.reduce((a, b) => a + b, 0), d = t - pars.reduce((a, b) => a + b, 0);
   const sq = strokes.map((s, i) => { const x = s - pars[i]; return x < 0 ? '\u{1F7E6}' : x === 0 ? '\u{1F7E9}' : x === 1 ? '\u{1F7E8}' : '\u{1F7E5}'; });
-  return 'Putt Daily #' + day + ' · ' + t + ' (' + fmtDiff(d) + ')\n' + sq.join('') + '\n' + SITE;
+  const sc = store.getScored(day), sub = sc && sc.sub;
+  const rank = sub && sub.rank ? ' · #' + sub.rank + ' of ' + sub.of : '';
+  return 'Putt Daily #' + day + ' · ' + t + ' (' + fmtDiff(d) + ')' + rank + '\n' + sq.join('') + '\n' + SITE;
 }
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); return true; } catch (_) {}
@@ -196,6 +269,7 @@ function archiveDays() {
   return out;
 }
 const maxScroll = () => Math.max(0, today() * ROW_H - VIEW_H);
+const boardMax = () => Math.max(0, ((board.data && board.data.entries.length) || 0) * BOARD_ROW - BOARD_VIEW);
 
 function click(id) {
   ui_sfx();
@@ -205,6 +279,10 @@ function click(id) {
   else if (id === 'again') doPractice(card.day);
   else if (id === 'archive') { screen = 'archive'; scroll = 0; }
   else if (id === 'settings') screen = 'settings';
+  else if (id === 'board') openBoard(screen === 'card' && card ? card.day : today());
+  else if (id === 'board:prev') { if (board.day > 1) openBoard(board.day - 1); }
+  else if (id === 'board:next') { if (board.day < today()) openBoard(board.day + 1); }
+  else if (id === 'rename') askNick(() => { const d = card.day; store.setSubmit(d, null); submitScored(d); });
   else if (id === 'music') setMusicOn(!isMusicOn());
   else if (id === 'sound') setSfxOn(!isSfxOn());
   else if (id === 'copy') {
@@ -260,6 +338,7 @@ canvas.addEventListener('pointermove', e => {
   const p = pos(e);
   press.moved = Math.max(press.moved, Math.abs(p.x - press.sx) + Math.abs(p.y - press.sy));
   if (screen === 'archive') scroll = Math.max(0, Math.min(maxScroll(), scroll - (p.y - press.ly)));
+  if (screen === 'board') board.scroll = Math.max(0, Math.min(boardMax(), board.scroll - (p.y - press.ly)));
   press.ly = p.y;
 });
 canvas.addEventListener('pointerup', e => {
@@ -271,6 +350,7 @@ canvas.addEventListener('pointerup', e => {
 canvas.addEventListener('pointercancel', () => { press = null; swallow = false; });
 canvas.addEventListener('wheel', e => {
   if (screen === 'archive') { e.preventDefault(); scroll = Math.max(0, Math.min(maxScroll(), scroll + e.deltaY)); }
+  if (screen === 'board') { e.preventDefault(); board.scroll = Math.max(0, Math.min(boardMax(), board.scroll + e.deltaY)); }
 }, { passive: false });
 
 const input = createInput(canvas, {
@@ -319,15 +399,17 @@ function frame(now) {
     }
     checkFinish(false, now);
     drawFrame(ctx, layer, hole, sim, input.aim(), now);
+    if (result && trails) drawTrails(ctx, trails, now - trailsAt);
     const shown = result ? run.idx : run.idx + 1;   // run.idx already advanced once the hole is done
     drawPlayHud(ctx, ui, { hole: shown, name: hole.name || hole.id, par: hole.par, strokes: sim.strokes, practice: run.mode === 'practice' });
-    if (result) drawResult(ctx, result.label, result.final ? 'Tap for scorecard' : 'Tap for next hole');
+    if (result) drawResult(ctx, result.label, result.final ? 'Tap for scorecard' : 'Tap for next hole', hole.cup.y);
   } else {
     acc = 0;
     if (!titleLayer || titleLayer.kind !== kind) titleLayer = buildTitleLayer(K);
     drawTitleScene(ctx, titleLayer, now);
     if (screen === 'title') drawTitle(ctx, ui, titleState());
     else if (screen === 'settings') drawSettings(ctx, ui, settingsState());
+    else if (screen === 'board') drawBoard(ctx, ui, { ...board, today: today() });
     else if (screen === 'card') drawCard(ctx, ui, cardState());
     else if (screen === 'archive') drawArchive(ctx, ui, { days: archiveDays(), scroll });
   }
@@ -336,6 +418,15 @@ function frame(now) {
 try {
   const sq = new URLSearchParams(location.search).get('screen');
   if (sq === 'settings' || sq === 'archive') screen = sq;
+  if (sq === 'board') openBoard(today());
+  // ?dev=1: a tiny hook for automated playtests (the server replays every run, so it grants nothing).
+  if (new URLSearchParams(location.search).has('dev')) window.__putt = {
+    state: () => ({ screen, idx: run && run.idx, sim: sim && sim.state, result: !!result, trails: trails ? trails.length : 0, card: screen === 'card' ? cardState() : null }),
+    play: doPlay,
+    shoot: s => { shoot(sim, s); run.shots.push(s); store.saveRun(run.mode, run); },
+    next: () => { if (result.final) goCard(); else enterHole(); },
+    course: () => course,
+  };
   const hq = Number(new URLSearchParams(location.search).get('hole'));
   if (hq >= 1 && hq <= 9) { startRun(today(), 'practice'); run.idx = hq - 1; enterHole(); }
 } catch (_) {}

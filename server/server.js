@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { handleWeather } from './weather.js';
+import { handlePlayers, DB_FILE } from './players.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -106,6 +107,12 @@ async function handle(req, res) {
     return notFound(res);
   }
 
+  if (pathname === '/api/run' || pathname === '/api/board' || pathname === '/api/trails') {
+    const ip = String(req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '?');
+    const out = await handlePlayers(req, url, pathname, ip);
+    return send(res, out.status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }, JSON.stringify(out.body));
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') return notFound(res);
 
   if (pathname === '/health') {
@@ -164,7 +171,7 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`putt-daily ${VERSION} listening on http://${HOST}:${PORT}`);
+  console.log(`putt-daily ${VERSION} listening on http://${HOST}:${PORT}, db ${DB_FILE}`);
 });
 
 let shuttingDown = false;

@@ -36,8 +36,10 @@ export function button(ctx, ui, id, x, y, w, h, label, enabled = true, style = '
   ctx.fillStyle = !enabled ? '#3a463e' : main ? '#e9b949' : on ? '#3d9152' : '#2c6e3e'; ctx.fill();
   ctx.strokeStyle = !enabled ? '#56645a' : main ? '#fff0b8' : GOLD; ctx.lineWidth = 0.8; ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,' + (main ? 0.3 : 0.14) + ')'; ctx.fillRect(x + 2, y + 1, w - 4, 1);
-  const fs = h >= 24 ? 10 : 8;
-  ctx.font = 'bold ' + fs + 'px ' + FAM; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  let fs = h >= 24 ? 10 : 8;
+  ctx.font = 'bold ' + fs + 'px ' + FAM;
+  while (fs > 6 && ctx.measureText(label).width > w - 6) { fs -= 0.5; ctx.font = 'bold ' + fs + 'px ' + FAM; }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = main ? '#3a2a05' : !enabled ? '#8a978e' : '#ffffff';
   ctx.fillText(label, x + w / 2, y + h / 2 + 0.6);
   if (enabled) ui.push({ id, x, y, w, h });
@@ -87,8 +89,9 @@ export function drawTitle(ctx, ui, st) {
 
   button(ctx, ui, 'play', 8, 234, 96, 30, st.playLabel, true, 'main');
   button(ctx, ui, 'practice', 110, 234, 62, 30, st.practiceLabel);
-  button(ctx, ui, 'archive', 8, 274, 80, 26, 'Archive');
-  button(ctx, ui, 'settings', 92, 274, 80, 26, 'Settings');
+  button(ctx, ui, 'board', 8, 274, 62, 26, 'Leaderboard');
+  button(ctx, ui, 'archive', 74, 274, 48, 26, 'Archive');
+  button(ctx, ui, 'settings', 126, 274, 46, 26, 'Settings');
 }
 
 export function drawSettings(ctx, ui, st) {
@@ -146,10 +149,16 @@ export function drawCard(ctx, ui, st) {
   txt(ctx, 'Total', 20, yt + 2, CREAM, 'left', 'bold 11px monospace');
   txt(ctx, String(ts), 118, yt + 2, CREAM, 'center', 'bold 11px monospace');
   txt(ctx, fmtDiff(ts - tp), 158, yt + 2, diffColor(ts - tp), 'center', 'bold 11px monospace');
-  if (!st.practice) txt(ctx, 'Streak ' + st.streak + (st.nick ? '  ·  ' + st.nick : ''), W / 2, yt + 22, SOFT, 'center', '8px monospace');
-  button(ctx, ui, 'menu', 8, 282, 76, 28, 'Menu');
-  if (!st.practice) button(ctx, ui, 'copy', 92, 282, 80, 28, st.copied ? 'Copied!' : 'Copy result', true, 'main');
-  else button(ctx, ui, 'again', 92, 282, 80, 28, 'Again', true, 'main');
+  if (!st.practice) {
+    txt(ctx, 'Streak ' + st.streak + (st.nick ? '  \u00B7  ' + st.nick : ''), W / 2, yt + 19, SOFT, 'center', '8px monospace');
+    if (st.rankLine) txt(ctx, st.rankLine, W / 2, yt + 33, GOLD, 'center', 'bold 9px monospace');
+    if (st.rankSub) txt(ctx, st.rankSub, W / 2, yt + 46, CREAM, 'center', '8px monospace');
+    if (st.nameErr) button(ctx, ui, 'rename', W / 2 - 40, yt + 46, 80, 20, 'Change name');
+  }
+  button(ctx, ui, 'menu', 8, 282, 48, 28, 'Menu');
+  button(ctx, ui, 'board', 60, 282, 56, 28, 'Leaderboard');
+  if (!st.practice) button(ctx, ui, 'copy', 120, 282, 52, 28, st.copied ? 'Copied!' : 'Copy result', true, 'main');
+  else button(ctx, ui, 'again', 120, 282, 52, 28, 'Again', true, 'main');
 }
 
 export const ROW_H = 24, VIEW_Y = 30, VIEW_H = 244;
@@ -175,4 +184,62 @@ export function drawArchive(ctx, ui, st) {
   ctx.restore();
   button(ctx, ui, 'menu', 8, 282, 76, 26, 'Back');
   txt(ctx, 'Tap a day to practice it', W - 8, 291, CREAM, 'right', '7px monospace');
+}
+
+// ---- leaderboard
+export const BOARD_ROW = 18, BOARD_Y = 52, BOARD_VIEW = 196;
+
+export function drawBoard(ctx, ui, st) {
+  panel(ctx, 8, 6, W - 16, 40);
+  button(ctx, ui, 'board:prev', 12, 11, 24, 30, '\u25C0', st.day > 1);
+  button(ctx, ui, 'board:next', W - 36, 11, 24, 30, '\u25B6', st.day < st.today);
+  txt(ctx, 'DAY ' + st.day + (st.day === st.today ? ' \u00B7 TODAY' : ''), W / 2, 12, GOLD, 'center', 'bold 10px monospace');
+  const d = st.data;
+  if (d && d.name) txt(ctx, d.name.slice(0, 26), W / 2, 27, SOFT, 'center', '7.5px monospace');
+
+  panel(ctx, 6, BOARD_Y - 2, W - 12, BOARD_VIEW + 4, 0.93);
+  if (st.loading || st.err || !d) {
+    txt(ctx, st.loading ? 'Loading...' : st.err || '', W / 2, BOARD_Y + 80, CREAM, 'center', '8px monospace');
+  } else if (!d.entries.length) {
+    txt(ctx, 'Nobody has played this day yet.', W / 2, BOARD_Y + 80, CREAM, 'center', '8px monospace');
+  } else {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(8, BOARD_Y, W - 16, BOARD_VIEW); ctx.clip();
+    for (let i = 0; i < d.entries.length; i++) {
+      const e = d.entries[i], y = BOARD_Y + i * BOARD_ROW - st.scroll;
+      if (y + BOARD_ROW < BOARD_Y || y > BOARD_Y + BOARD_VIEW) continue;
+      ctx.fillStyle = e.you ? 'rgba(242,199,92,0.28)' : i % 2 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.09)';
+      ctx.fillRect(8, y, W - 16, BOARD_ROW - 1);
+      const medal = ['#f2c75c', '#d8dde3', '#d08a4e'][e.r - 1];
+      if (medal) { ctx.fillStyle = medal; ctx.beginPath(); ctx.arc(19, y + 8.5, 5.5, 0, 6.2832); ctx.fill(); }
+      txt(ctx, String(e.r), 19, y + 4, medal ? '#2a1d05' : SOFT, 'center', 'bold 8px monospace');
+      let nick = e.nick;
+      ctx.font = 'bold 8px ' + FAM;
+      const room = e.bot ? 70 : 88;
+      while (nick.length > 3 && ctx.measureText(nick).width > room) nick = nick.slice(0, -1);
+      txt(ctx, nick, 30, y + 4, e.you ? GOLD : CREAM, 'left', 'bold 8px monospace');
+      if (e.bot) {
+        const bx = 30 + measure(ctx, nick, 'bold 8px monospace') + 4;
+        ctx.fillStyle = 'rgba(134,208,255,0.25)'; ctx.fillRect(bx, y + 4, 16, 9);
+        txt(ctx, 'BOT', bx + 8, y + 5, '#86d0ff', 'center', 'bold 6px monospace');
+      }
+      txt(ctx, String(e.total), 138, y + 4, CREAM, 'right', 'bold 8px monospace');
+      txt(ctx, fmtDiff(e.diff), W - 14, y + 4, diffColor(e.diff), 'right', 'bold 8px monospace');
+    }
+    ctx.restore();
+  }
+
+  if (d) {
+    let line = d.humans === 1 ? '1 player' : d.humans + ' players';
+    if (d.showsBots) line += ' \u00B7 bots fill in on quiet days';
+    txt(ctx, line, W / 2, 252, SOFT, 'center', '7px monospace');
+    if (d.you) {
+      const you = d.you;
+      txt(ctx, 'You: #' + you.rank + ' of ' + you.of + '  \u00B7  ' + you.total + ' (' + fmtDiff(you.total - d.par) + ')', W / 2, 264, GOLD, 'center', 'bold 8px monospace');
+    } else if (st.day === st.today) {
+      txt(ctx, 'Play today\'s round to get on the board', W / 2, 264, CREAM, 'center', '7.5px monospace');
+    }
+  }
+  button(ctx, ui, 'menu', 8, 282, 76, 26, 'Back');
+  txt(ctx, 'Ties: first to finish', W - 8, 291, SOFT, 'right', '7px monospace');
 }

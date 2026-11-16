@@ -51,22 +51,23 @@ Done when: every look keeps the ball, cup, walls and hazards easy to read on a 3
 
 ## v0.5: other players
 
-- [ ] Node and SQLite service on the Debian VM
-- [ ] Submit a run; server replays it to check the score
-- [ ] Daily leaderboard
-- [ ] Shot trails after each hole
-- [ ] Bot scores and trails for quiet days
-- [ ] Name filter and rate limits
+- [x] Node and SQLite service on the Debian VM (`/data/putt-daily.db`, built-in `node:sqlite`)
+- [x] Submit a run; server replays it to check the score (one scored run per device a day, unfinished holes and extra shots rejected)
+- [x] Daily leaderboard: ranked by total, ties to whoever finished first, any past day browsable
+- [x] Shot trails after each hole: yours in gold, up to 30 others in white
+- [x] Bot scores and trails for quiet days: five tagged bots of different skill, hidden once 10 people have played
+- [x] Name filter and rate limits
+- [x] Rank and "better than N% of players" on the scorecard and in the copied result
 
 Done when: two phones playing the same day see each other's trails and scores.
 
 ## v0.6: launch
 
-- [ ] Deploy to the parbs.online subdomain with versioned assets
-- [ ] Card on parbs.online with a gameplay loop
+- [x] Deploy to the parbs.online subdomain with versioned assets
+- [x] Card on parbs.online (still image; a gameplay loop is still to do)
 - [ ] Link-preview image for shared scorecards
 - [ ] Playtest pass on hole difficulty
-- [ ] "Better than N% of players" on the scorecard
+- [x] "Better than N% of players" on the scorecard
 - [ ] Challenge link: a shared link carries your run, and a friend plays against your trail
 - [ ] Generated course name each day, with hole 9 as the signature hole
 - [ ] Shot of the day: the title screen replays the day's best hole-in-one

@@ -85,3 +85,15 @@ Location: `lat`/`lon` query, else Cloudflare `cf-iplatitude`/`cf-iplongitude` he
 ## Dev URL switches
 
 `?hole=N` starts today's practice round at hole N. `?screen=settings|archive`. `?wx=<kind>`.
+
+## Other players (v0.5): `server/players.js`
+
+SQLite at `$DATA_DIR/putt-daily.db`, table `runs (day, pid, nick, total, strokes, shots, bot, created)`, unique `(day, pid)`.
+
+- `POST /api/run` `{ day, pid, nick, shots: [9 x [{ax, ay, p}]] }`. `day` must be today or yesterday (UTC). `pid` is a random 16-32 hex device id from `store.pid()`. Each hole is replayed with `replayRun`; it must end holed or at 8 strokes with no shots left over. Returns `{ ok, fresh, rank, of, humans, better, total, strokes, par }`; errors `{ error: 'name' | 'day' | 'pid' | 'shots' | 'unfinished' | 'extra shots' }`. A second run from the same pid returns the first one.
+- `GET /api/board?day=N&pid=X` top 50 `{ r, nick, total, diff, bot, you, s }`, plus `you`, `humans`, `showsBots`, `par`, `name`.
+- `GET /api/trails?day=N&hole=K` up to 30 `{ bot, shots }`, humans first.
+- Bots (`shared/bot.js`): five seeded skill levels, inserted on first use of a day; listed and counted only while fewer than 10 people have played. Ties sort humans before bots.
+- Names: `server/names.js` `cleanNick()`. Rate limits per IP: 12 submits / 10 min, 240 reads / min.
+
+`?dev=1` exposes `window.__putt` (state, play, shoot, next, course) for automated playtests.

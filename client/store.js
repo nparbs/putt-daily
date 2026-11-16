@@ -26,13 +26,35 @@ export function getDay(n) { return days()[n] || null; }
 export function getScored(n) { const d = getDay(n); return d && d.sc ? d.sc : null; }   // { s:[9], t, p }
 export function getBest(n) { const d = getDay(n); return d && d.b ? { t: d.b, p: d.bp } : null; }
 
-export function recordRun(day, mode, strokes, parTotal) {
+// Random device id: the server keeps one scored run per id per day. No account.
+export function pid() {
+  let v = get('pd.pid', '');
+  if (typeof v !== 'string' || !/^[a-f0-9]{16,32}$/.test(v)) {
+    const b = new Uint8Array(12);
+    try { crypto.getRandomValues(b); } catch (_) { for (let i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256); }
+    v = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+    set('pd.pid', v);
+  }
+  return v;
+}
+
+// holes: the shot list of each hole, kept with the scored run so it can be
+// (re)sent to the leaderboard.
+export function recordRun(day, mode, strokes, parTotal, holes) {
   const all = days();
   const d = all[day] || {};
   const t = strokes.reduce((a, b) => a + b, 0);
-  if (mode === 'daily' && !d.sc) d.sc = { s: strokes.slice(), t, p: parTotal };
+  if (mode === 'daily' && !d.sc) d.sc = { s: strokes.slice(), t, p: parTotal, h: holes || null, sub: null };
   if (!d.b || t < d.b) { d.b = t; d.bp = parTotal; }
   all[day] = d;
+  set(KEYS.days, all);
+}
+
+// Leaderboard result for the scored run: { rank, of, humans, better } or { err }.
+export function setSubmit(day, sub) {
+  const all = days();
+  if (!all[day] || !all[day].sc) return;
+  all[day].sc.sub = sub;
   set(KEYS.days, all);
 }
 

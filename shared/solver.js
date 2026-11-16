@@ -249,7 +249,7 @@ function aim(dx, dy, rot, p) {
   return { ax, ay, p };
 }
 
-function candidates(field, x, y) {
+export function candidates(field, x, y) {
   const hole = field.hole;
   const out = [];
   const cx = hole.cup.x, cy = hole.cup.y;

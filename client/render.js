@@ -2,7 +2,7 @@
 // pixels per unit (see view.js), so edges, the ball and text stay sharp on phones.
 // The static parts of a hole go on a cached layer; slopes, water, flag, ball and
 // weather animate per frame.
-import { BALL_R } from '../shared/physics.js';
+import { BALL_R, simulateShot } from '../shared/physics.js';
 import { W, H } from './input.js';
 import { HUD_H } from './hud.js';
 import * as wx from './weather.js';
@@ -305,4 +305,51 @@ export function drawTitleScene(ctx, layer, t) {
   drawFlag(ctx, cx, cy, t, w);
   if (k < 0.6) drawBall(ctx, bx, by);
   wx.drawSky(ctx, t, w);
+}
+
+// ---- trails: other players' shots on this hole, shown once you've finished it.
+// Each trail is a list of shot paths (a water shot ends where the ball went in).
+export function buildTrails(hole, lists) {
+  const out = [];
+  for (const item of lists) {
+    const shots = item.shots || item;
+    let from = { x: hole.tee.x, y: hole.tee.y };
+    const paths = [];
+    let strokes = 0, holed = false;
+    for (const s of shots) {
+      if (holed || strokes >= 8) break;
+      let r;
+      try { r = simulateShot(hole, from, s); } catch (_) { break; }
+      paths.push(r.path.length > 1 ? r.path : [from, r.end]);
+      strokes += r.strokesAdded; holed = r.holed;
+      from = r.end;
+    }
+    out.push({ paths, bot: !!item.bot, mine: !!item.mine, holed, end: from });
+  }
+  return out;
+}
+
+export function drawTrails(ctx, trails, age) {
+  if (!trails || !trails.length) return;
+  const k = Math.min(1, age / 1600);          // draw in over 1.6 s
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const pass of [0, 1]) {               // others first, yours on top
+    for (const tr of trails) {
+      if ((pass === 1) !== tr.mine) continue;
+      ctx.strokeStyle = tr.mine ? 'rgba(255,214,90,0.95)' : tr.bot ? 'rgba(200,230,255,0.35)' : 'rgba(255,255,255,0.42)';
+      ctx.lineWidth = tr.mine ? 1.1 : 0.7;
+      let shown = false;
+      for (const path of tr.paths) {
+        const n = Math.max(2, Math.ceil(path.length * k));
+        ctx.beginPath();
+        for (let i = 0; i < Math.min(n, path.length); i++) {
+          const pt = path[i];
+          if (i === 0) ctx.moveTo(pt.x, OY + pt.y); else ctx.lineTo(pt.x, OY + pt.y);
+        }
+        ctx.stroke();
+        shown = true;
+      }
+      if (shown && k >= 1 && !tr.holed) circle(ctx, tr.mine ? '#ffd65a' : 'rgba(255,255,255,0.6)', tr.end.x, OY + tr.end.y, tr.mine ? 1.4 : 1);
+    }
+  }
 }

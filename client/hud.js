@@ -16,8 +16,11 @@ export function resultLabel(strokes, par, holed) {
   return '+' + d;
 }
 
-export function drawResult(ctx, label, sub) {
-  panel(ctx, 22, 122, 136, 48, 0.9);
-  txt(ctx, label, 90, 130, label === 'Hole in one!' ? GOLD : '#ffffff', 'center', 'bold 14px monospace');
-  txt(ctx, sub, 90, 153, SOFT, 'center', '8px monospace');
+// Sits at whichever end of the screen is away from the cup, so the trails that
+// end there stay visible.
+export function drawResult(ctx, label, sub, cupY = 0) {
+  const y = cupY < 145 ? 262 : 30;
+  panel(ctx, 22, y, 136, 42, 0.9);
+  txt(ctx, label, 90, y + 6, label === 'Hole in one!' ? GOLD : '#ffffff', 'center', 'bold 14px monospace');
+  txt(ctx, sub, 90, y + 27, SOFT, 'center', '8px monospace');
 }
