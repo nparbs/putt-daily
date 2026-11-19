@@ -20,3 +20,5 @@ export function submitRun(day, pid, nick, holes) {
 }
 export const getBoard = (day, pid) => call('/api/board?day=' + day + '&pid=' + encodeURIComponent(pid));
 export const getTrails = (day, hole) => call('/api/trails?day=' + day + '&hole=' + hole);
+export const getChallenge = (code, pid) => call('/api/challenge?c=' + encodeURIComponent(code) + '&pid=' + encodeURIComponent(pid));
+export const getShot = day => call('/api/shot?day=' + day);

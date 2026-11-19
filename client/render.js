@@ -324,7 +324,7 @@ export function buildTrails(hole, lists) {
       strokes += r.strokesAdded; holed = r.holed;
       from = r.end;
     }
-    out.push({ paths, bot: !!item.bot, mine: !!item.mine, holed, end: from });
+    out.push({ paths, bot: !!item.bot, mine: !!item.mine, rival: !!item.rival, holed, end: from });
   }
   return out;
 }
@@ -333,11 +333,11 @@ export function drawTrails(ctx, trails, age) {
   if (!trails || !trails.length) return;
   const k = Math.min(1, age / 1600);          // draw in over 1.6 s
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const pass of [0, 1]) {               // others first, yours on top
+  for (const pass of [0, 1, 2]) {            // others first, then a challenger's, yours on top
     for (const tr of trails) {
-      if ((pass === 1) !== tr.mine) continue;
-      ctx.strokeStyle = tr.mine ? 'rgba(255,214,90,0.95)' : tr.bot ? 'rgba(200,230,255,0.35)' : 'rgba(255,255,255,0.42)';
-      ctx.lineWidth = tr.mine ? 1.1 : 0.7;
+      if (pass !== (tr.mine ? 2 : tr.rival ? 1 : 0)) continue;
+      ctx.strokeStyle = tr.mine ? 'rgba(255,214,90,0.95)' : tr.rival ? 'rgba(255,120,96,0.95)' : tr.bot ? 'rgba(200,230,255,0.35)' : 'rgba(255,255,255,0.42)';
+      ctx.lineWidth = tr.mine || tr.rival ? 1.1 : 0.7;
       let shown = false;
       for (const path of tr.paths) {
         const n = Math.max(2, Math.ceil(path.length * k));
@@ -349,7 +349,7 @@ export function drawTrails(ctx, trails, age) {
         ctx.stroke();
         shown = true;
       }
-      if (shown && k >= 1 && !tr.holed) circle(ctx, tr.mine ? '#ffd65a' : 'rgba(255,255,255,0.6)', tr.end.x, OY + tr.end.y, tr.mine ? 1.4 : 1);
+      if (shown && k >= 1 && !tr.holed) circle(ctx, tr.mine ? '#ffd65a' : tr.rival ? '#ff7860' : 'rgba(255,255,255,0.6)', tr.end.x, OY + tr.end.y, tr.mine || tr.rival ? 1.4 : 1);
     }
   }
 }

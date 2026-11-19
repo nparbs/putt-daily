@@ -45,7 +45,7 @@ The sim uses only `+ - * /`, `Math.sqrt`, `Math.abs`, `Math.min/max`, `Math.floo
 - `shoot(sim, shot)` starts a stroke from rest. Throws if not at rest.
 - `step(sim)` advances one fixed step and returns an array of events: `{ type: 'wall'|'bumper'|'sand'|'water'|'lip'|'holed'|'stop', speed }`. On water the ball is put back at the shot's start spot, a penalty stroke is added, and the state goes to `'rest'`.
 - `simulateShot(hole, from, shot)` runs one stroke to rest/holed without a sim object and returns `{ path: [{x,y}] (every 4th step), end: {x,y}, holed, water, strokesAdded }`. Used by trails, the solver and the server.
-- `replayRun(hole, shots)` plays shots from the tee, returns `{ strokes, holed }`.
+- `replayRun(hole, shots)` plays shots from the tee, returns `{ strokes, holed, used }` (`used` = shots actually played).
 
 ## `shared/holes.js` exports
 
@@ -84,7 +84,7 @@ Location: `lat`/`lon` query, else Cloudflare `cf-iplatitude`/`cf-iplongitude` he
 
 ## Dev URL switches
 
-`?hole=N` starts today's practice round at hole N. `?screen=settings|archive`. `?wx=<kind>`.
+`?dev=1&hole=N` starts today's practice round at hole N (needs `dev`). `?screen=settings|archive`. `?wx=<kind>`.
 
 ## Other players (v0.5): `server/players.js`
 
@@ -97,3 +97,12 @@ SQLite at `$DATA_DIR/putt-daily.db`, table `runs (day, pid, nick, total, strokes
 - Names: `server/names.js` `cleanNick()`. Rate limits per IP: 12 submits / 10 min, 240 reads / min.
 
 `?dev=1` exposes `window.__putt` (state, play, shoot, next, course) for automated playtests.
+
+## v0.6: challenges, shot of the day, previews
+
+- `POST /api/run` also returns `code`: 8 letters/digits, one per human run, made on first submit.
+- `GET /api/challenge?c=CODE&pid=X` `{ day, nick, total, par, diff, strokes, shots, self }` (no device id); 404 if unknown. The client keeps it as `pd.rival` and shows it for that day only.
+- `GET /api/shot?day=N` `{ day, ace: { nick, bot, hole, shot } | null }`: people before bots, then the later hole, then the earliest. Cached 60 s.
+- `/?vs=CODE` serves the page with Open Graph tags for that run; `/` gets today's. Images: `/og/<day>.png`, `/og/c/<code>.png` (`server/og.js`, 1200 x 630, own PNG encoder).
+- PWA: `/manifest.webmanifest`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`, `/favicon.png`, `/sw.js` (cache named by build; `/api/*` never cached).
+- `SITE` env var sets the absolute URL used in the tags (default `https://putt.parbs.online`).

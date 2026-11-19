@@ -34,7 +34,7 @@ export function setSfxOn(v) { sfxOn = !!v; saveFlag(LS_SFX, sfxOn); applyGains()
 
 export function unlockAudio() {
   try {
-    if (unlocked) { if (ctx && ctx.state === 'suspended' && !document.hidden) ctx.resume(); return; }
+    if (unlocked) { if (ctx && ctx.state !== 'running' && !document.hidden) ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     ctx = new AC();

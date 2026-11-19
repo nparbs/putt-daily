@@ -6,7 +6,10 @@
 //                  its own stroke count. One scored run per device id per day.
 // GET  /api/board?day=N&pid=X     top 50 + your row + counts
 // GET  /api/trails?day=N&hole=K   up to 30 shot lists for that hole
+// GET  /api/challenge?c=CODE      a shared run to play against
+// GET  /api/shot?day=N            the day's best hole-in-one
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { generateCourse, dayNumber } from '../shared/daily.js';
@@ -35,6 +38,9 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS runs_board ON runs (day, total, bot, created);
 `);
+// v0.6: a short public code per human run, used in challenge links.
+if (!db.prepare('PRAGMA table_info(runs)').all().some(c => c.name === 'code')) db.exec('ALTER TABLE runs ADD COLUMN code TEXT');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS runs_code ON runs (code)');
 
 const q = {
   get: db.prepare('SELECT * FROM runs WHERE day = ? AND pid = ?'),
@@ -45,7 +51,53 @@ const q = {
   worseHumans: db.prepare('SELECT COUNT(*) AS n FROM runs WHERE day = ? AND bot = 0 AND total > ?'),
   top: db.prepare('SELECT nick, total, strokes, bot, pid FROM runs WHERE day = ? AND (bot = 0 OR ?) ORDER BY total, bot, created LIMIT 50'),
   trails: db.prepare('SELECT shots, bot FROM runs WHERE day = ? ORDER BY bot, RANDOM() LIMIT 60'),
+  setCode: db.prepare('UPDATE runs SET code = ? WHERE id = ? AND code IS NULL'),
+  setNick: db.prepare('UPDATE runs SET nick = ? WHERE id = ?'),
+  byCode: db.prepare('SELECT * FROM runs WHERE code = ?'),
+  aces: db.prepare('SELECT nick, bot, strokes, shots FROM runs WHERE day = ? ORDER BY bot, created LIMIT 2000'),
 };
+
+const CODE_CHARS = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export const CODE_RE = /^[a-zA-Z0-9]{8}$/;
+function ensureCode(row) {
+  if (row.code || row.bot) return row.code || null;
+  for (let tries = 0; tries < 5; tries++) {
+    const b = crypto.randomBytes(8);
+    const code = Array.from(b, x => CODE_CHARS[x % CODE_CHARS.length]).join('');
+    try { q.setCode.run(code, row.id); return q.get.get(row.day, row.pid).code; } catch (_) { /* clash, try again */ }
+  }
+  return null;
+}
+
+/** A shared run by code: { day, nick, total, par, diff, strokes, shots, pid } or null. */
+export function challengeRun(code) {
+  if (typeof code !== 'string' || !CODE_RE.test(code)) return null;
+  const row = q.byCode.get(code);
+  if (!row) return null;
+  const par = parOf(courseFor(row.day));
+  return { day: row.day, nick: row.nick, total: row.total, par, diff: row.total - par, strokes: JSON.parse(row.strokes), shots: JSON.parse(row.shots), pid: row.pid };
+}
+
+// Shot of the day: the best hole-in-one, people before bots, then the later
+// (harder) hole, then whoever played first. Cached a minute per day.
+const aceCache = new Map();
+function shotOfDay(day) {
+  const hit = aceCache.get(day);
+  if (hit && Date.now() - hit.at < 60e3) return hit.v;
+  let best = null;
+  for (const row of q.aces.all(day)) {
+    const st = JSON.parse(row.strokes);
+    for (let k = 8; k >= 0; k--) {
+      if (st[k] !== 1) continue;
+      const cand = { nick: row.nick, bot: !!row.bot, hole: k + 1, shot: JSON.parse(row.shots)[k][0] };
+      if (!best || (best.bot && !cand.bot) || (best.bot === cand.bot && cand.hole > best.hole)) best = cand;
+      break;
+    }
+  }
+  aceCache.set(day, { at: Date.now(), v: best });
+  if (aceCache.size > 8) aceCache.delete(aceCache.keys().next().value);
+  return best;
+}
 
 // Bots fill the board only while fewer than this many people have played.
 const QUIET = 10;
@@ -55,11 +107,13 @@ const courses = new Map();
 function courseFor(day) {
   if (!courses.has(day)) {
     courses.set(day, generateCourse(day));
-    if (courses.size > 4) courses.delete(courses.keys().next().value);
+    if (courses.size > 64) courses.delete(courses.keys().next().value);
   }
   return courses.get(day);
 }
 const parOf = c => c.holes.reduce((a, h) => a + h.par, 0);
+
+export { courseFor };
 
 function ensureBots(day) {
   if (q.bots.get(day).n >= BOTS.length) return;
@@ -118,8 +172,7 @@ function checkRun(body) {
     const r = replayRun(c.holes[k], clean);
     if (!r.holed && r.strokes < STROKE_LIMIT) return { err: 'unfinished' };
     // every shot must have been played: none left over after the hole ended
-    const used = replayRun(c.holes[k], clean.slice(0, -1));
-    if (clean.length > 1 && (used.holed || used.strokes >= STROKE_LIMIT)) return { err: 'extra shots' };
+    if (r.used < clean.length) return { err: 'extra shots' };
     strokes.push(r.strokes);
   }
   return { day, strokes, total: strokes.reduce((a, b) => a + b, 0), course: c };
@@ -154,8 +207,12 @@ export async function handlePlayers(req, url, pathname, ip) {
       q.insert.run(v.day, body.pid, nick, v.total, JSON.stringify(v.strokes), JSON.stringify(body.shots), 0, Date.now());
       row = q.get.get(v.day, body.pid);
       fresh = true;
+    } else if (row.nick !== nick) {
+      q.setNick.run(nick, row.id);   // "Change name" after a resend keeps the first score
+      row = q.get.get(v.day, body.pid);
     }
-    return { status: 200, body: { ok: true, fresh, strokes: JSON.parse(row.strokes), par: parOf(v.course), ...standing(v.day, row) } };
+    const code = ensureCode(row);
+    return { status: 200, body: { ok: true, fresh, code, strokes: JSON.parse(row.strokes), par: parOf(v.course), ...standing(v.day, row) } };
   }
 
   if (pathname === '/api/board') {
@@ -190,6 +247,22 @@ export async function handlePlayers(req, url, pathname, ip) {
     const humans = rows.filter(r => !r.bot);
     const pick = (humans.length >= 30 ? humans : rows).slice(0, 30);
     return { status: 200, body: { day, hole, trails: pick.map(r => ({ bot: !!r.bot, shots: JSON.parse(r.shots)[hole - 1] })) } };
+  }
+
+  if (pathname === '/api/challenge') {
+    if (limited(ip, 'read', 240, 60e3)) return { status: 429, body: { error: 'slow down' } };
+    const ch = challengeRun(url.searchParams.get('c'));
+    if (!ch || ch.day > dayNumber()) return { status: 404, body: { error: 'not found' } };
+    const pid = url.searchParams.get('pid') || '';
+    const { pid: owner, ...pub } = ch;
+    return { status: 200, body: { ...pub, self: !!pid && pid === owner } };
+  }
+
+  if (pathname === '/api/shot') {
+    if (limited(ip, 'read', 240, 60e3)) return { status: 429, body: { error: 'slow down' } };
+    const day = intParam(url, 'day');
+    if (day == null || day < 1 || day > dayNumber()) return { status: 400, body: { error: 'day' } };
+    return { status: 200, body: { day, ace: shotOfDay(day) } };
   }
   return null;
 }

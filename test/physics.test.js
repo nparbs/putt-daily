@@ -82,7 +82,7 @@ test('golden: replayRun stroke count', () => {
   const b = replayRun(LHOLE, shots);
   assert.deepEqual(a, b);
   assert.deepEqual(a, GOLDEN_REPLAY);
-  assert.deepEqual(replayRun(LHOLE, [{ ax: -52, ay: -999, p: 1000 }, { ax: 998, ay: 70, p: 400 }]), { strokes: 2, holed: true });
+  assert.deepEqual(replayRun(LHOLE, [{ ax: -52, ay: -999, p: 1000 }, { ax: 998, ay: 70, p: 400 }]), { strokes: 2, holed: true, used: 2 });
 });
 
 test('water: ball returns to shot start with a penalty stroke', () => {
@@ -105,7 +105,7 @@ test('water: ball returns to shot start with a penalty stroke', () => {
 
   // Eight attempts into the water caps at the stroke limit.
   const many = Array(10).fill({ ax: 0, ay: -1000, p: 500 });
-  assert.deepEqual(replayRun(waterHole, many), { strokes: STROKE_LIMIT, holed: false });
+  assert.deepEqual(replayRun(waterHole, many), { strokes: STROKE_LIMIT, holed: false, used: 4 });
 });
 
 test('cannot shoot while moving; invalid shots rejected', () => {
@@ -205,4 +205,4 @@ test('tile wall segments merge collinear runs', async () => {
 });
 
 const GOLDEN_END = { x: 137.35051227446866, y: 37.02423540807416 };
-const GOLDEN_REPLAY = { strokes: 4, holed: true };
+const GOLDEN_REPLAY = { strokes: 4, holed: true, used: 4 };

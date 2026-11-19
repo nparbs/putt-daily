@@ -71,6 +71,21 @@ export function drawPlayHud(ctx, ui, st) {
   if (st.practice) txt(ctx, 'PRACTICE', 99, 13.5, '#ffb06a', 'center', 'bold 7px monospace');
   txt(ctx, 'Strokes ' + Math.min(st.strokes, 8), W - 5, 13.5, CREAM, 'right', 'bold 8px monospace');
   button(ctx, ui, 'menu', W - 42, 2, 37, 10, 'MENU');
+  ui.push({ id: 'menu', x: W - 52, y: 0, w: 52, h: 24 });   // bigger hit area than the drawn button
+}
+
+// A tappable panel with a bold line and a smaller one under it.
+// `room` leaves space on the right for a close button.
+function cardButton(ctx, ui, id, y, h, line1, line2, color = CREAM, room = 0) {
+  panel(ctx, 8, y, W - 16, h, 0.88);
+  const cx = (W - room) / 2, maxW = W - 24 - room;
+  const fit = (s, bold, size) => {
+    while (size > 6 && measure(ctx, s, (bold ? 'bold ' : '') + size + 'px monospace') > maxW) size -= 0.5;
+    return (bold ? 'bold ' : '') + size + 'px monospace';
+  };
+  txt(ctx, line1, cx, y + 5, color, 'center', fit(line1, true, 8.5));
+  if (line2) txt(ctx, line2, cx, y + 17, SOFT, 'center', fit(line2, false, 7.5));
+  ui.push({ id, x: 8, y, w: W - 16, h });
 }
 
 export function drawTitle(ctx, ui, st) {
@@ -79,6 +94,13 @@ export function drawTitle(ctx, ui, st) {
   txt(ctx, 'Day ' + st.day, W / 2, 34, CREAM, 'center', 'bold 10px monospace');
   if (st.courseName) txt(ctx, st.courseName.slice(0, 34), W / 2, 48, SOFT, 'center', '8px monospace');
   weatherChip(ctx, W / 2, 63);
+
+  // challenge from a shared link, and the shot of the day, in the gap over the green
+  if (st.rival) {
+    cardButton(ctx, ui, 'rival', 86, 30, st.rival.line1, st.rival.line2, '#ff9a84', 18);
+    button(ctx, ui, 'rival:x', W - 28, 91, 16, 20, '✕');
+  }
+  if (st.ace) cardButton(ctx, ui, 'shot', st.rival ? 122 : 104, 30, '▶ ' + st.ace.line1, st.ace.line2, GOLD);
 
   panel(ctx, 8, 160, W - 16, 66);
   txt(ctx, st.todayLine, W / 2, 166, st.todayDone ? '#a7f070' : CREAM, 'center', 'bold 9px monospace');
@@ -155,9 +177,10 @@ export function drawCard(ctx, ui, st) {
     if (st.rankSub) txt(ctx, st.rankSub, W / 2, yt + 46, CREAM, 'center', '8px monospace');
     if (st.nameErr) button(ctx, ui, 'rename', W / 2 - 40, yt + 46, 80, 20, 'Change name');
   }
+  if (st.vsLine) txt(ctx, st.vsLine, W / 2, st.practice ? yt + 22 : yt + 59, '#ff9a84', 'center', 'bold 8.5px monospace');
   button(ctx, ui, 'menu', 8, 282, 48, 28, 'Menu');
   button(ctx, ui, 'board', 60, 282, 56, 28, 'Leaderboard');
-  if (!st.practice) button(ctx, ui, 'copy', 120, 282, 52, 28, st.copied ? 'Copied!' : 'Copy result', true, 'main');
+  if (!st.practice) button(ctx, ui, 'copy', 120, 282, 52, 28, st.copied ? st.copied : st.shareLabel, true, 'main');
   else button(ctx, ui, 'again', 120, 282, 52, 28, 'Again', true, 'main');
 }
 
@@ -242,4 +265,15 @@ export function drawBoard(ctx, ui, st) {
   }
   button(ctx, ui, 'menu', 8, 282, 76, 26, 'Back');
   txt(ctx, 'Ties: first to finish', W - 8, 291, SOFT, 'right', '7px monospace');
+}
+
+// ---- shot of the day: the hole is drawn by main.js, this is the frame around it
+export function drawShotHud(ctx, ui, st) {
+  ctx.fillStyle = 'rgba(10,26,16,0.9)'; ctx.fillRect(0, 0, W, 24);
+  ctx.fillStyle = 'rgba(242,199,92,0.5)'; ctx.fillRect(0, 23.4, W, 0.6);
+  // all in the top bar, so nothing covers the tee or the cup
+  txt(ctx, 'Hole in one by ' + st.nick + (st.bot ? ' (bot)' : ''), 5, 3, GOLD, 'left', 'bold 8px monospace');
+  txt(ctx, 'Day ' + st.day + ' · hole ' + st.hole + ' · ' + st.name, 5, 13.5, SOFT, 'left', '7px monospace');
+  button(ctx, ui, 'menu', W - 42, 2, 37, 10, 'BACK');
+  ui.push({ id: 'menu', x: W - 52, y: 0, w: 52, h: 24 });
 }

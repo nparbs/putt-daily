@@ -317,10 +317,12 @@ export function simulateShot(hole, from, shot) {
 
 export function replayRun(hole, shots) {
   const sim = createSim(hole);
+  let used = 0;
   for (const shot of shots) {
     if (sim.state === 'holed' || sim.strokes >= STROKE_LIMIT) break;
     shoot(sim, shot);
+    used++;
     while (sim.state === 'moving') step(sim);
   }
-  return { strokes: Math.min(sim.strokes, STROKE_LIMIT), holed: sim.state === 'holed' };
+  return { strokes: Math.min(sim.strokes, STROKE_LIMIT), holed: sim.state === 'holed', used };
 }

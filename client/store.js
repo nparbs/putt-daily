@@ -80,3 +80,10 @@ export function saveRun(slot, run) {
   if (run) all[slot] = run; else delete all[slot];
   set(KEYS.runs, all);
 }
+
+// A friend's shared run to play against: { code, day, nick, total, par, diff, strokes, shots }.
+export function getRival() {
+  const r = get('pd.rival', null);
+  return r && Number.isInteger(r.day) && Array.isArray(r.shots) && r.shots.length === 9 && Array.isArray(r.strokes) ? r : null;
+}
+export function setRival(r) { set('pd.rival', r || null); }

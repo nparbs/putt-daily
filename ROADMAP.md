@@ -65,12 +65,38 @@ Done when: two phones playing the same day see each other's trails and scores.
 
 - [x] Deploy to the parbs.online subdomain with versioned assets
 - [x] Card on parbs.online (still image; a gameplay loop is still to do)
-- [ ] Link-preview image for shared scorecards
+- [x] Link-preview image for shared scorecards: `/og/<day>.png` (signature hole 9, day, course name) and `/og/c/<code>.png` for challenges, drawn on the server with no dependencies
 - [ ] Playtest pass on hole difficulty
 - [x] "Better than N% of players" on the scorecard
-- [ ] Challenge link: a shared link carries your run, and a friend plays against your trail
-- [ ] Generated course name each day, with hole 9 as the signature hole
-- [ ] Shot of the day: the title screen replays the day's best hole-in-one
+- [x] Challenge link: the shared result links `/?vs=<code>`; a friend sees "beat Sam's 31", plays the same day, and gets Sam's trail in coral plus a running lead after each hole and on the scorecard (past days play as practice)
+- [x] Generated course name each day, with hole 9 as the signature hole
+- [x] Shot of the day: the title screen replays the day's best hole-in-one (today's once you've played, yesterday's before, so no spoilers)
+
+Also in v0.6 (from the research and code audit, 2026-11-18):
+
+- [x] Share button opens the phone share sheet; desktop copies
+- [x] Installable: web manifest, icons and a service worker, so the page loads offline after the first visit
+- [x] Haptics on Android: putt (by power), hard bounces, water, cup. Follows the Effects switch
+- [x] Sound comes back after a phone call or app switch (iOS suspends the audio context)
+- [x] Leaderboard submit retries with backoff (15 s, 45 s, 2 min, then every 5 min) and when the page comes back
+- [x] "Change name" after a score was sent now renames the board entry
+- [x] `?hole=N` only works with `?dev=1`, so it can't spoil archive bests
+- [x] Bigger MENU tap area; one bad frame no longer freezes the game
+- [x] Server: course cache holds 64 days, each hole replays once
+
+## v0.7: polish and habit (proposed)
+
+From the research agent's survey of daily games and the code audit. Plain theme still; nothing here changes the rules.
+
+- [ ] Stats screen: games played, average vs par, best round, longest streak, aces, a small score histogram
+- [ ] Cup juice: a short pixel burst and ball squash when it drops, a tiny screen nudge on hard bounces
+- [ ] Colour-blind help: symbols next to the coloured +/- on the scorecard and board
+- [ ] Bigger minimum text (8 units) for anything that matters, after the phone playtest
+- [ ] Day number from server time when the phone clock is wrong (offset from `/api/version`)
+- [ ] Render menu screens at about 30 fps to save battery
+- [ ] Note on the title when storage is blocked (private mode), since the run can't resume
+- [ ] Trails: avoid `ORDER BY RANDOM()` once days have hundreds of runs
+- [ ] Rule for deploys: never change generator or physics output for a day that is already live
 
 ## Later, not committed
 
@@ -79,3 +105,7 @@ Done when: two phones playing the same day see each other's trails and scores.
 - Private rooms to race friends on today's course
 - Ball and flag skins earned by streaks
 - Streak rewards, golden cup, weekly cup, under-two-minutes mode
+- Streak freeze: one missed day a week doesn't break the streak
+- Share one hole's trail as an image after a great shot
+- Milestone badges: first ace, 7-day streak, a full week under par
+- Friends board from shared challenge codes

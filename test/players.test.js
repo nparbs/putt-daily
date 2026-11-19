@@ -78,3 +78,39 @@ test('name filter: blocks abuse, keeps ordinary names', () => {
   for (const n of ['Cucumber', 'Essex Ed', 'Peacock', 'Torpedo', 'Grape', 'Raccoon', 'Hancock']) assert.equal(cleanNick(n), n);
   for (const n of ['f u c k', 'N1gg4', 'big ass', 'ab', 'x'.repeat(17)]) assert.equal(cleanNick(n), null);
 });
+
+test('challenge codes: stable per run, hide the device id, know their owner', async () => {
+  const pid = 'd'.repeat(16);
+  const a = await post({ day, pid, nick: 'Friend', shots: good });
+  assert.match(a.body.code, /^[a-zA-Z0-9]{8}$/);
+  const b = await post({ day, pid, nick: 'Renamed', shots: good });
+  assert.equal(b.body.code, a.body.code);
+  const c = await get('/api/challenge?c=' + a.body.code + '&pid=' + 'e'.repeat(16));
+  assert.equal(c.status, 200);
+  assert.equal(c.body.nick, 'Renamed');        // a later resend can change the name, not the score
+  assert.equal(c.body.total, goodTotal);
+  assert.equal(c.body.self, false);
+  assert.equal(c.body.shots.length, 9);
+  assert.ok(!('pid' in c.body));
+  assert.equal((await get('/api/challenge?c=' + a.body.code + '&pid=' + pid)).body.self, true);
+  assert.equal((await get('/api/challenge?c=nope')).status, 404);
+});
+
+test('shot of the day prefers people over bots', async () => {
+  const r = await get('/api/shot?day=' + day);
+  assert.equal(r.status, 200);
+  const humanAce = good.some(s => s.length === 1 && replayRun(course.holes[good.indexOf(s)], s).holed);
+  if (r.body.ace) {
+    assert.ok(r.body.ace.hole >= 1 && r.body.ace.hole <= 9);
+    if (humanAce) assert.equal(r.body.ace.bot, false);
+  }
+  assert.equal((await get('/api/shot?day=0')).status, 400);
+});
+
+test('link-preview image is a 1200 x 630 PNG', async () => {
+  const { ogImage } = await import('../server/og.js');
+  const buf = ogImage(course, { nick: 'Sam', total: 30, diff: 4 });
+  assert.deepEqual([...buf.subarray(0, 4)], [137, 80, 78, 71]);
+  assert.equal(buf.readUInt32BE(16), 1200);
+  assert.equal(buf.readUInt32BE(20), 630);
+});
