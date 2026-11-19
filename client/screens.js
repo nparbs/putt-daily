@@ -111,9 +111,10 @@ export function drawTitle(ctx, ui, st) {
 
   button(ctx, ui, 'play', 8, 234, 96, 30, st.playLabel, true, 'main');
   button(ctx, ui, 'practice', 110, 234, 62, 30, st.practiceLabel);
-  button(ctx, ui, 'board', 8, 274, 62, 26, 'Leaderboard');
-  button(ctx, ui, 'archive', 74, 274, 48, 26, 'Archive');
-  button(ctx, ui, 'settings', 126, 274, 46, 26, 'Settings');
+  button(ctx, ui, 'board', 8, 274, 52, 26, 'Leaderboard');
+  button(ctx, ui, 'stats', 63, 274, 34, 26, 'Stats');
+  button(ctx, ui, 'archive', 100, 274, 36, 26, 'Archive');
+  button(ctx, ui, 'settings', 139, 274, 33, 26, '⚙');
 }
 
 export function drawSettings(ctx, ui, st) {
@@ -276,4 +277,53 @@ export function drawShotHud(ctx, ui, st) {
   txt(ctx, 'Day ' + st.day + ' · hole ' + st.hole + ' · ' + st.name, 5, 13.5, SOFT, 'left', '7px monospace');
   button(ctx, ui, 'menu', W - 42, 2, 37, 10, 'BACK');
   ui.push({ id: 'menu', x: W - 52, y: 0, w: 52, h: 24 });
+}
+
+// ---- stats: everything is from this device's scored daily runs
+const DIST_LABELS = ['≤-3', '-2', '-1', 'E', '+1', '+2', '+3', '+4', '≥+5'];
+export function drawStats(ctx, ui, st) {
+  panel(ctx, 8, 6, W - 16, 20);
+  txt(ctx, 'YOUR STATS', W / 2, 10, GOLD, 'center', 'bold 11px monospace');
+
+  panel(ctx, 8, 32, W - 16, 46);
+  const tiles = [
+    [String(st.played), 'played'],
+    [st.played ? fmtDiff(Math.round(st.sumDiff / st.played * 10) / 10) : '-', 'avg vs par'],
+    [st.best == null ? '-' : fmtDiff(st.best), 'best'],
+    [String(st.streak), 'streak'],
+    [String(st.longest), 'longest'],
+  ];
+  const tw = (W - 24) / tiles.length;
+  tiles.forEach(([v, l], i) => {
+    const cx = 12 + tw * i + tw / 2;
+    txt(ctx, v, cx, 38, CREAM, 'center', 'bold 13px monospace');
+    txt(ctx, l, cx, 56, SOFT, 'center', '6.5px monospace');
+  });
+  if (st.best != null) txt(ctx, 'Best round: Day ' + st.bestDay, W / 2, 67, SOFT, 'center', '6.5px monospace');
+
+  panel(ctx, 8, 84, W - 16, 132);
+  txt(ctx, 'Rounds vs par', 16, 89, SOFT, 'left', 'bold 7.5px monospace');
+  const max = Math.max(1, ...st.dist), y0 = 101, rowH = 12.4;
+  for (let i = 0; i < 9; i++) {
+    const y = y0 + i * rowH, n = st.dist[i], w = Math.max(n ? 10 : 2, (W - 70) * n / max);
+    const col = diffColor(i - 3);
+    txt(ctx, DIST_LABELS[i], 36, y + 1, col, 'right', 'bold 7.5px monospace');
+    ctx.fillStyle = n ? col : 'rgba(255,255,255,0.15)'; ctx.globalAlpha = n ? 0.85 : 1;
+    ctx.fillRect(42, y, w, rowH - 3); ctx.globalAlpha = 1;
+    if (n) txt(ctx, String(n), 42 + w - 2, y + 1, '#1b1b12', 'right', 'bold 7px monospace');
+  }
+
+  panel(ctx, 8, 222, W - 16, 52);
+  txt(ctx, 'Holes', 16, 227, SOFT, 'left', 'bold 7.5px monospace');
+  const H5 = [['Aces', st.holes.ace, GOLD], ['Under', st.holes.under, '#86d0ff'], ['Par', st.holes.par, '#a7f070'],
+    ['Bogey', st.holes.bogey, '#ffd84a'], ['Worse', st.holes.worse, '#ff6a4d']];
+  const hw = (W - 24) / 5;
+  H5.forEach(([l, v, c], i) => {
+    const cx = 12 + hw * i + hw / 2;
+    txt(ctx, String(v), cx, 239, c, 'center', 'bold 11px monospace');
+    txt(ctx, l, cx, 255, SOFT, 'center', '6.5px monospace');
+  });
+
+  button(ctx, ui, 'menu', 8, 282, 76, 26, 'Back');
+  txt(ctx, st.played ? 'Daily runs on this device' : 'Play a daily round to start', W - 8, 291, SOFT, 'right', '7px monospace');
 }

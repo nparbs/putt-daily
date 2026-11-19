@@ -108,3 +108,13 @@ test('fallback holes pass the bot', () => {
 });
 
 const GOLDEN_DAY1 = 'afa2286e';
+
+// Live days must never change: a player's stored run, the bots and everyone's
+// trails are only valid against the exact course that was served that day.
+// If a generator or physics change breaks this, gate it on the day number.
+test('past courses are frozen', async () => {
+  const { createHash } = await import('node:crypto');
+  const GOLDEN = { 1: '9af82ebc0d735a14', 5: 'b5433d02579fcf61', 9: '0bd37b805e145a80' };
+  for (const [d, h] of Object.entries(GOLDEN))
+    assert.equal(createHash('sha256').update(JSON.stringify(generateCourse(Number(d)))).digest('hex').slice(0, 16), h, 'day ' + d + ' changed');
+});

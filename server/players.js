@@ -80,7 +80,7 @@ export function challengeRun(code) {
 
 // Shot of the day: the best hole-in-one, people before bots, then the later
 // (harder) hole, then whoever played first. Cached a minute per day.
-const aceCache = new Map();
+const aceCache = new Map(), trailCache = new Map();
 function shotOfDay(day) {
   const hit = aceCache.get(day);
   if (hit && Date.now() - hit.at < 60e3) return hit.v;
@@ -242,11 +242,17 @@ export async function handlePlayers(req, url, pathname, ip) {
     const today = dayNumber();
     const day = intParam(url, 'day'), hole = intParam(url, 'hole');
     if (day == null || day < 1 || day > today || hole == null || hole < 1 || hole > 9) return { status: 400, body: { error: 'bad params' } };
+    const key = day + ':' + hole, hit = trailCache.get(key);
+    if (hit && Date.now() - hit.at < 30e3) return { status: 200, body: hit.body };
     ensureBots(day);
     const rows = q.trails.all(day);
     const humans = rows.filter(r => !r.bot);
     const pick = (humans.length >= 30 ? humans : rows).slice(0, 30);
-    return { status: 200, body: { day, hole, trails: pick.map(r => ({ bot: !!r.bot, shots: JSON.parse(r.shots)[hole - 1] })) } };
+    const out = { day, hole, trails: pick.map(r => ({ bot: !!r.bot, shots: JSON.parse(r.shots)[hole - 1] })) };
+    // The random sample is shared for 30 s, so a busy day sorts the table at most twice a minute per hole.
+    trailCache.set(key, { at: Date.now(), body: out });
+    if (trailCache.size > 200) trailCache.delete(trailCache.keys().next().value);
+    return { status: 200, body: out };
   }
 
   if (pathname === '/api/challenge') {

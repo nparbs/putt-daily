@@ -84,19 +84,19 @@ Also in v0.6 (from the research and code audit, 2026-11-18):
 - [x] Bigger MENU tap area; one bad frame no longer freezes the game
 - [x] Server: course cache holds 64 days, each hole replays once
 
-## v0.7: polish and habit (proposed)
+## v0.7: polish and habit
 
 From the research agent's survey of daily games and the code audit. Plain theme still; nothing here changes the rules.
 
-- [ ] Stats screen: games played, average vs par, best round, longest streak, aces, a small score histogram
-- [ ] Cup juice: a short pixel burst and ball squash when it drops, a tiny screen nudge on hard bounces
-- [ ] Colour-blind help: symbols next to the coloured +/- on the scorecard and board
+- [x] Stats screen: games played, average vs par, best round, streak and longest streak, rounds-vs-par chart, hole results (aces, under, par, bogey, worse)
+- [x] Cup juice: a short pixel burst when the ball drops, a tiny screen nudge on hard bounces (off with the phone's reduce-motion setting)
+- [ ] Colour-blind help: the scorecard and board already print the +/- number; the shared squares are still colour only
 - [ ] Bigger minimum text (8 units) for anything that matters, after the phone playtest
-- [ ] Day number from server time when the phone clock is wrong (offset from `/api/version`)
-- [ ] Render menu screens at about 30 fps to save battery
-- [ ] Note on the title when storage is blocked (private mode), since the run can't resume
-- [ ] Trails: avoid `ORDER BY RANDOM()` once days have hundreds of runs
-- [ ] Rule for deploys: never change generator or physics output for a day that is already live
+- [x] Day number from server time when the phone clock is more than 2 minutes off (`now` in `/api/version`)
+- [x] Menu screens draw at about 30 fps to save battery; play and replays stay at full rate
+- [x] Note on the title when storage is blocked (private mode), since the run can't resume
+- [x] Trails: each hole's random sample is cached for 30 s, so busy days don't re-sort the table per request
+- [x] Rule for deploys: never change generator or physics output for a live day. A test pins days 1, 5 and 9; gate any change on the day number
 
 ## Later, not committed
 

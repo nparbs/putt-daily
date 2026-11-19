@@ -106,3 +106,9 @@ SQLite at `$DATA_DIR/putt-daily.db`, table `runs (day, pid, nick, total, strokes
 - `/?vs=CODE` serves the page with Open Graph tags for that run; `/` gets today's. Images: `/og/<day>.png`, `/og/c/<code>.png` (`server/og.js`, 1200 x 630, own PNG encoder).
 - PWA: `/manifest.webmanifest`, `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`, `/favicon.png`, `/sw.js` (cache named by build; `/api/*` never cached).
 - `SITE` env var sets the absolute URL used in the tags (default `https://putt.parbs.online`).
+
+## v0.7
+
+- `GET /api/version` also returns `now` (server ms). The client uses it for the day number only when the phone clock is off by more than 2 minutes.
+- `?screen=stats` opens the stats screen. `store.stats(today, parsFn)` and `store.storageOk`.
+- Frozen courses: `test/daily.test.js` pins the hash of days 1, 5 and 9. Never change what a live day generates.

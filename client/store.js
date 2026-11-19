@@ -87,3 +87,36 @@ export function getRival() {
   return r && Number.isInteger(r.day) && Array.isArray(r.shots) && r.shots.length === 9 && Array.isArray(r.strokes) ? r : null;
 }
 export function setRival(r) { set('pd.rival', r || null); }
+
+// False when the browser blocks storage (some private modes): progress then
+// lasts only until the page is closed.
+export const storageOk = (() => {
+  try { localStorage.setItem('pd.t', '1'); localStorage.removeItem('pd.t'); return true; } catch (_) { return false; }
+})();
+
+// Totals over every scored daily run on this device.
+export function stats(today, pars) {
+  const all = days();
+  const out = { played: 0, sumDiff: 0, best: null, bestDay: 0, streak: streak(today), longest: 0,
+    holes: { ace: 0, under: 0, par: 0, bogey: 0, worse: 0 }, dist: new Array(9).fill(0) };
+  let run = 0, prev = -1;
+  const scored = Object.keys(all).map(Number).filter(n => all[n] && all[n].sc).sort((a, b) => a - b);
+  for (const n of scored) {
+    const sc = all[n].sc, d = sc.t - sc.p;
+    out.played++; out.sumDiff += d;
+    if (out.best == null || d < out.best) { out.best = d; out.bestDay = n; }
+    run = n === prev + 1 ? run + 1 : 1; prev = n;
+    out.longest = Math.max(out.longest, run);
+    out.dist[Math.max(0, Math.min(8, d + 3))]++;          // buckets: <=-3, -2, -1, E, +1, +2, +3, +4, >=+5
+    const hp = pars(n);
+    sc.s.forEach((s, i) => {
+      const x = s - hp[i];
+      if (s === 1) out.holes.ace++;
+      else if (x < 0) out.holes.under++;
+      else if (x === 0) out.holes.par++;
+      else if (x === 1) out.holes.bogey++;
+      else out.holes.worse++;
+    });
+  }
+  return out;
+}

@@ -181,7 +181,7 @@ async function handle(req, res) {
       res,
       200,
       { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' },
-      JSON.stringify({ version: VERSION, build: BUILD }),
+      JSON.stringify({ version: VERSION, build: BUILD, now: Date.now() }),   // now: clients with a wrong clock use it
     );
   }
 

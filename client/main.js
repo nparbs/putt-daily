@@ -1,5 +1,5 @@
 import { createSim, shoot, step, MAX_SPEED, simulateShot } from '../shared/physics.js';
-import { generateCourse, dayNumber, dateOfDay } from '../shared/daily.js';
+import { generateCourse, dayNumber, dateOfDay, PARS } from '../shared/daily.js';
 import { W, H, createInput } from './input.js';
 import { buildLayer, drawFrame, buildTitleLayer, drawTitleScene, buildTrails, drawTrails, OY } from './render.js';
 import * as net from './net.js';
@@ -7,7 +7,7 @@ import * as wx from './weather.js';
 import { drawResult, resultLabel, MAX_STROKES } from './hud.js';
 import { unlockAudio, sfx, startMusic, setMusicOn, setSfxOn, isMusicOn, isSfxOn, setWeatherAmbience } from './audio.js';
 import * as store from './store.js';
-import { drawPlayHud, drawTitle, drawCard, drawArchive, drawSettings, drawBoard, drawShotHud, fmtDiff, ROW_H, VIEW_H, BOARD_ROW, BOARD_VIEW } from './screens.js';
+import { drawPlayHud, drawTitle, drawCard, drawArchive, drawSettings, drawBoard, drawShotHud, drawStats, fmtDiff, ROW_H, VIEW_H, BOARD_ROW, BOARD_VIEW } from './screens.js';
 
 const SITE = 'https://putt.parbs.online';
 const canvas = document.getElementById('game');
@@ -55,7 +55,12 @@ function courseFor(day) {
   return courses.get(day);
 }
 const parTotal = c => c.holes.reduce((a, h) => a + h.par, 0);
-const today = () => dayNumber();
+let clockOffset = 0;                 // ms to add to the phone clock (only set when it is off by > 2 min)
+const today = () => dayNumber(new Date(Date.now() + clockOffset));
+fetch('/api/version', { cache: 'no-store' }).then(r => r.json()).then(b => {
+  const off = Number(b && b.now) - Date.now();
+  if (Number.isFinite(off) && Math.abs(off) > 120e3) clockOffset = off;
+}).catch(() => {});
 
 // ---- audio (first pointerdown unlocks; nothing plays before)
 let unlocked = false;
@@ -180,12 +185,29 @@ function openBoard(day) {
   });
 }
 
+// ---- juice: a burst when the ball drops, a small nudge on hard hits
+const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+let burst = null, shakeAt = -1e9, shakeAmp = 0;
+function drawBurst(now) {
+  if (!burst) return;
+  const t = (now - burst.t) / 700;
+  if (t >= 1) { burst = null; return; }
+  for (let k = 0; k < 14; k++) {
+    const a = k / 14 * Math.PI * 2 + burst.seed, sp = 10 + (k * 7 % 5) * 3;
+    const x = burst.x + Math.cos(a) * sp * t, y = OY + burst.y + Math.sin(a) * sp * t + 14 * t * t;
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = k % 3 ? '#fff4c2' : '#f2c75c';
+    ctx.fillRect(x - 0.6, y - 0.6, 1.2, 1.2);
+  }
+  ctx.globalAlpha = 1;
+}
+
 function onEvents(evs) {
   for (const e of evs) {
     const i = (e.speed || 0) / MAX_SPEED;
-    if (e.type === 'holed') { lipped = false; play('cup', i); buzz([18, 50, 30]); }
+    if (e.type === 'holed') { lipped = false; play('cup', i); buzz([18, 50, 30]); burst = { t: performance.now(), x: hole.cup.x, y: hole.cup.y, seed: Math.random() * 6 }; }
     else if (e.type === 'water') { play('water', i); buzz(40); }
-    else if ((e.type === 'wall' || e.type === 'bumper') && i > 0.35) { play(e.type, i); buzz(8); }
+    else if ((e.type === 'wall' || e.type === 'bumper') && i > 0.35) { play(e.type, i); buzz(8); if (i > 0.6 && !reduceMotion) { shakeAt = performance.now(); shakeAmp = (i - 0.5) * 1.6; } }
     else if (e.type === 'lip') { lipped = true; play('lip', i); }
     else if (e.type === 'stop') { if (lipped && sim.state !== 'holed') play('groan', 1); lipped = false; }
     else if (e.type === 'wall' || e.type === 'bumper' || e.type === 'sand' || e.type === 'water') play(e.type, i);
@@ -375,6 +397,7 @@ function click(id) {
   else if (id === 'again') doPractice(card.day);
   else if (id === 'archive') { screen = 'archive'; scroll = 0; }
   else if (id === 'settings') screen = 'settings';
+  else if (id === 'stats') screen = 'stats';
   else if (id === 'board') openBoard(screen === 'card' && card ? card.day : today());
   else if (id === 'board:prev') { if (board.day > 1) openBoard(board.day - 1); }
   else if (id === 'board:next') { if (board.day < today()) openBoard(board.day + 1); }
@@ -476,6 +499,7 @@ function titleState() {
   if (sc) line = 'Today: ' + sc.t + ' (' + fmtDiff(sc.t - sc.p) + ')';
   else if (dr) line = 'Round in progress: hole ' + (dr.idx + 1) + '/9';
   if (dr && dr.day !== d) n = 'Finishing Day ' + dr.day + ' (counts for that day)';
+  else if (!store.storageOk) n = 'Storage is blocked: progress ends when you close this page';
   return {
     day: d, courseName: c.name, todayLine: line, todayDone: !!sc, streak: store.streak(d), nick: store.getNick(), note: n,
     playLabel: dr ? 'Continue' : sc ? 'Scorecard' : 'Play',
@@ -487,8 +511,13 @@ function titleState() {
 }
 
 // One bad frame must not freeze the game: log it and keep the loop going.
+let lastDraw = 0;
 function frame(now) {
-  try { drawOnce(now); } catch (e) { console.error(e); }
+  const menu = screen !== 'play' && screen !== 'shot';
+  if (!menu || now - lastDraw >= 30) {
+    lastDraw = now;
+    try { drawOnce(now); } catch (e) { console.error(e); }
+  }
   requestAnimationFrame(frame);
 }
 function drawOnce(now) {
@@ -505,7 +534,11 @@ function drawOnce(now) {
       if (sim.state === 'moving') onEvents(step(sim));
     }
     checkFinish(false, now);
+    const sk = now - shakeAt < 140 ? shakeAmp * (1 - (now - shakeAt) / 140) : 0;
+    if (sk) ctx.translate((Math.random() - 0.5) * sk, (Math.random() - 0.5) * sk);
     drawFrame(ctx, layer, hole, sim, input.aim(), now);
+    drawBurst(now);
+    if (sk) ctx.setTransform(K, 0, 0, K, 0, 0);
     if (result && trails) drawTrails(ctx, trails, now - trailsAt);
     const shown = result ? run.idx : run.idx + 1;   // run.idx already advanced once the hole is done
     drawPlayHud(ctx, ui, { hole: shown, name: hole.name || hole.id, par: hole.par, strokes: sim.strokes, practice: run.mode === 'practice' });
@@ -530,11 +563,12 @@ function drawOnce(now) {
     else if (screen === 'board') drawBoard(ctx, ui, { ...board, today: today() });
     else if (screen === 'card') drawCard(ctx, ui, cardState());
     else if (screen === 'archive') drawArchive(ctx, ui, { days: archiveDays(), scroll });
+    else if (screen === 'stats') drawStats(ctx, ui, store.stats(today(), () => PARS));
   }
 }
 try {
   const sq = new URLSearchParams(location.search).get('screen');
-  if (sq === 'settings' || sq === 'archive') screen = sq;
+  if (sq === 'settings' || sq === 'archive' || sq === 'stats') screen = sq;
   if (sq === 'board') openBoard(today());
   // ?dev=1: a tiny hook for automated playtests (the server replays every run, so it grants nothing).
   if (new URLSearchParams(location.search).has('dev')) window.__putt = {
