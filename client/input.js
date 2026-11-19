@@ -1,6 +1,7 @@
 // Slingshot input: press anywhere, drag back, release to putt.
 export const W = 180, H = 320;
-const MAX_DRAG = 60;   // internal px of drag for full power
+const MAX_DRAG = 34;   // internal px of drag for full power (~11% of screen height)
+const CURVE = 1.4;     // >1 = gentler at the start, so short putts keep fine control
 const MIN_DRAG = 6;    // below this on release = cancel
 
 export function createInput(canvas, { canAim, onShot, onTap }) {
@@ -17,7 +18,7 @@ export function createInput(canvas, { canAim, onShot, onTap }) {
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len < 0.5) return { active: false, len };
     const ax = Math.round(-dx / len * 1000), ay = Math.round(-dy / len * 1000);
-    const p = Math.max(1, Math.min(1000, Math.round(Math.min(len, MAX_DRAG) / MAX_DRAG * 1000)));
+    const p = Math.max(1, Math.min(1000, Math.round(Math.pow(Math.min(len, MAX_DRAG) / MAX_DRAG, CURVE) * 1000)));
     return { active: len >= MIN_DRAG && (ax !== 0 || ay !== 0), ax, ay, p, len };
   }
 
